@@ -21,7 +21,10 @@ export function createServer() {
     {
       title: 'Protected metric card',
       description: 'Render an OAuth-protected metric card as an MCP App.',
-      inputSchema: { title: z.string().default('Protected metric'), value: z.union([z.string(), z.number()]) },
+      inputSchema: {
+        title: z.string().default('Protected metric'),
+        value: z.union([z.string(), z.number()]),
+      },
       _meta: { ui: { resourceUri } },
     },
     ({ title, value }) => ({
@@ -29,8 +32,20 @@ export function createServer() {
       structuredContent: { title, value },
     }),
   );
-  registerAppResource(server, resourceUri, resourceUri, { mimeType: RESOURCE_MIME_TYPE }, async () => ({
-    contents: [{ uri: resourceUri, mimeType: RESOURCE_MIME_TYPE, text: await fs.readFile(path.join(directory, 'dist', 'app.html'), 'utf8') }],
-  }));
+  registerAppResource(
+    server,
+    resourceUri,
+    resourceUri,
+    { mimeType: RESOURCE_MIME_TYPE },
+    async () => ({
+      contents: [
+        {
+          uri: resourceUri,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: await fs.readFile(path.join(directory, 'dist', 'app.html'), 'utf8'),
+        },
+      ],
+    }),
+  );
   return server;
 }

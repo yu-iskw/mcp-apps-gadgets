@@ -76,9 +76,12 @@ export class BrowserOAuthProvider implements OAuthClientProvider {
   }
 
   invalidateCredentials(scope: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery') {
-    if (scope === 'all' || scope === 'client') sessionStorage.removeItem(key(this.connectionId, 'client'));
-    if (scope === 'all' || scope === 'tokens') sessionStorage.removeItem(key(this.connectionId, 'tokens'));
-    if (scope === 'all' || scope === 'verifier') sessionStorage.removeItem(key(this.connectionId, 'verifier'));
+    if (scope === 'all' || scope === 'client')
+      sessionStorage.removeItem(key(this.connectionId, 'client'));
+    if (scope === 'all' || scope === 'tokens')
+      sessionStorage.removeItem(key(this.connectionId, 'tokens'));
+    if (scope === 'all' || scope === 'verifier')
+      sessionStorage.removeItem(key(this.connectionId, 'verifier'));
   }
 
   logout() {

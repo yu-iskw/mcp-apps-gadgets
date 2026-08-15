@@ -12,6 +12,8 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
+import { BrowserOAuthProvider, clearOAuthCallback, oauthCallback } from './oauth.js';
+
 import type { CallToolResult, Resource, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 declare global {
@@ -23,7 +25,8 @@ declare global {
 }
 
 const hostInfo = { name: 'mcp-app-gadgets', version: '0.4.0' };
-const STORAGE_KEY = 'mcp-app-gadgets.document.v1';
+const STORAGE_KEY = 'mcp-app-gadgets.document.v2';
+const LEGACY_STORAGE_KEY = 'mcp-app-gadgets.document.v1';
 const GRID_COLUMNS = 12;
 const DEFAULT_COLUMNS = 6;
 const MIN_TILE_HEIGHT = 180;
@@ -35,9 +38,19 @@ interface GadgetLayout {
   height?: number;
 }
 
-interface GadgetConfig {
+type AuthMode = 'none' | 'oauth';
+
+interface ConnectionConfig {
   id: string;
   serverUrl: string;
+  displayName: string;
+  trust: 'trusted';
+  auth: { type: AuthMode };
+}
+
+interface GadgetConfig {
+  id: string;
+  connectionId: string;
   toolName: string;
   title: string;
   arguments: Record<string, unknown>;
@@ -45,7 +58,8 @@ interface GadgetConfig {
 }
 
 interface GadgetDocument {
-  version: 1;
+  version: 2;
+  connections: ConnectionConfig[];
   gadgets: GadgetConfig[];
 }
 
@@ -77,19 +91,37 @@ function parseLayout(value: unknown): GadgetLayout | undefined {
   return layout;
 }
 
-function parseGadget(value: unknown): GadgetConfig | undefined {
-  if (!isRecord(value) || !isRecord(value.arguments)) return undefined;
+function parseConnection(value: unknown): ConnectionConfig | undefined {
+  if (!isRecord(value) || !isRecord(value.auth)) return undefined;
   if (
     typeof value.id !== 'string' ||
     typeof value.serverUrl !== 'string' ||
-    typeof value.toolName !== 'string' ||
-    typeof value.title !== 'string'
-  ) {
+    typeof value.displayName !== 'string' ||
+    value.trust !== 'trusted' ||
+    (value.auth.type !== 'none' && value.auth.type !== 'oauth')
+  )
     return undefined;
-  }
   return {
     id: value.id,
     serverUrl: value.serverUrl,
+    displayName: value.displayName,
+    trust: 'trusted',
+    auth: { type: value.auth.type },
+  };
+}
+
+function parseV2Gadget(value: unknown): GadgetConfig | undefined {
+  if (!isRecord(value) || !isRecord(value.arguments)) return undefined;
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.connectionId !== 'string' ||
+    typeof value.toolName !== 'string' ||
+    typeof value.title !== 'string'
+  )
+    return undefined;
+  return {
+    id: value.id,
+    connectionId: value.connectionId,
     toolName: value.toolName,
     title: value.title,
     arguments: value.arguments,
@@ -99,16 +131,61 @@ function parseGadget(value: unknown): GadgetConfig | undefined {
 
 function parseDocument(raw: string): GadgetDocument {
   const parsed: unknown = JSON.parse(raw);
-  if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.gadgets)) {
+  if (!isRecord(parsed) || !Array.isArray(parsed.gadgets))
     throw new Error('Unsupported gadget document');
+  if (parsed.version === 2 && Array.isArray(parsed.connections)) {
+    return {
+      version: 2,
+      connections: parsed.connections.flatMap((value) => {
+        const item = parseConnection(value);
+        return item ? [item] : [];
+      }),
+      gadgets: parsed.gadgets.flatMap((value) => {
+        const item = parseV2Gadget(value);
+        return item ? [item] : [];
+      }),
+    };
   }
-  return {
-    version: 1,
-    gadgets: parsed.gadgets.flatMap((value) => {
-      const gadget = parseGadget(value);
-      return gadget ? [gadget] : [];
-    }),
-  };
+  if (parsed.version === 1) {
+    const connections: ConnectionConfig[] = [];
+    const byUrl = new Map<string, string>();
+    const gadgets = parsed.gadgets.flatMap((value, index) => {
+      if (
+        !isRecord(value) ||
+        !isRecord(value.arguments) ||
+        typeof value.serverUrl !== 'string' ||
+        typeof value.id !== 'string' ||
+        typeof value.toolName !== 'string' ||
+        typeof value.title !== 'string'
+      )
+        return [];
+      const normalized = new URL(value.serverUrl).href;
+      let connectionId = byUrl.get(normalized);
+      if (!connectionId) {
+        connectionId = `legacy-${connections.length + 1}`;
+        byUrl.set(normalized, connectionId);
+        connections.push({
+          id: connectionId,
+          serverUrl: normalized,
+          displayName: new URL(normalized).host,
+          trust: 'trusted',
+          auth: { type: 'none' },
+        });
+      }
+      return [
+        {
+          id: value.id,
+          connectionId,
+          toolName: value.toolName,
+          title: value.title,
+          arguments: value.arguments,
+          layout: parseLayout(value.layout),
+        } satisfies GadgetConfig,
+      ];
+    });
+    return { version: 2, connections, gadgets };
+  }
+  throw new Error('Unsupported gadget document');
 }
 
 function readUiMetadata(value: unknown): Pick<UiResourceData, 'csp' | 'permissions'> | undefined {
@@ -140,6 +217,7 @@ function newGadgetId(): string {
 
 const composer = document.querySelector<HTMLElement>('#composer')!;
 const serverUrlInput = document.querySelector<HTMLInputElement>('#server-url')!;
+const authModeInput = document.querySelector<HTMLSelectElement>('#auth-mode')!;
 const connectButton = document.querySelector<HTMLButtonElement>('#connect')!;
 const toolSelect = document.querySelector<HTMLSelectElement>('#tool')!;
 const titleInput = document.querySelector<HTMLInputElement>('#tile-title')!;
@@ -152,8 +230,8 @@ const importFileInput = document.querySelector<HTMLInputElement>('#import-file')
 const status = document.querySelector<HTMLOutputElement>('#status')!;
 const grid = document.querySelector<HTMLElement>('#grid')!;
 
-const connections = new Map<string, Promise<ServerConnection>>();
-let selectedServerUrl = serverUrlInput.value;
+const runtimeConnections = new Map<string, Promise<ServerConnection>>();
+let selectedConnectionId: string | undefined;
 const gadgetDocument = loadDocument();
 let draggedGadgetId: string | undefined;
 let editingGadgetId: string | undefined;
@@ -165,15 +243,41 @@ function setStatus(message: string) {
 function loadDocument(): GadgetDocument {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? parseDocument(raw) : { version: 1, gadgets: [] };
+    if (raw) return parseDocument(raw);
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    return legacy ? parseDocument(legacy) : { version: 2, connections: [], gadgets: [] };
   } catch (error) {
     console.warn('Could not restore gadget document', error);
-    return { version: 1, gadgets: [] };
+    return { version: 2, connections: [], gadgets: [] };
   }
 }
 
 function saveDocument() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(gadgetDocument));
+}
+
+function connectionById(id: string): ConnectionConfig {
+  const connection = gadgetDocument.connections.find((candidate) => candidate.id === id);
+  if (!connection) throw new Error(`Unknown MCP connection: ${id}`);
+  return connection;
+}
+
+function ensureConnection(serverUrl: string, authMode: AuthMode): ConnectionConfig {
+  const normalized = new URL(serverUrl).href;
+  const existing = gadgetDocument.connections.find(
+    (candidate) => candidate.serverUrl === normalized && candidate.auth.type === authMode,
+  );
+  if (existing) return existing;
+  const connection: ConnectionConfig = {
+    id: newGadgetId(),
+    serverUrl: normalized,
+    displayName: new URL(normalized).host,
+    trust: 'trusted',
+    auth: { type: authMode },
+  };
+  gadgetDocument.connections.push(connection);
+  saveDocument();
+  return connection;
 }
 
 function updateGadgetLayout(id: string, layout: GadgetLayout) {
@@ -222,14 +326,25 @@ async function listAllResources(client: Client): Promise<Resource[]> {
   return resources;
 }
 
-async function connectServer(serverUrl: string): Promise<ServerConnection> {
-  const normalized = new URL(serverUrl).href;
-  const existing = connections.get(normalized);
+async function connectServer(config: ConnectionConfig): Promise<ServerConnection> {
+  const existing = runtimeConnections.get(config.id);
   if (existing) return existing;
-
   const pending = (async () => {
     const client = new Client(hostInfo);
-    await client.connect(new StreamableHTTPClientTransport(new URL(normalized)));
+    const provider =
+      config.auth.type === 'oauth'
+        ? new BrowserOAuthProvider(config.id, config.serverUrl)
+        : undefined;
+    const transport = new StreamableHTTPClientTransport(
+      new URL(config.serverUrl),
+      provider ? { authProvider: provider } : undefined,
+    );
+    const callback = oauthCallback();
+    if (provider && callback?.connectionId === config.id) {
+      await transport.finishAuth(callback.code);
+      clearOAuthCallback();
+    }
+    await client.connect(transport);
     const [tools, resources] = await Promise.all([listAllTools(client), listAllResources(client)]);
     return {
       client,
@@ -237,18 +352,19 @@ async function connectServer(serverUrl: string): Promise<ServerConnection> {
       resources: new Map(resources.map((resource) => [resource.uri, resource])),
     };
   })().catch((error) => {
-    connections.delete(normalized);
+    runtimeConnections.delete(config.id);
     throw error;
   });
-  connections.set(normalized, pending);
+  runtimeConnections.set(config.id, pending);
   return pending;
 }
 
 async function discoverApps(preferredTool?: string) {
   try {
     setStatus('Discovering…');
-    selectedServerUrl = new URL(serverUrlInput.value).href;
-    const connection = await connectServer(selectedServerUrl);
+    const selected = ensureConnection(serverUrlInput.value, authModeInput.value as AuthMode);
+    selectedConnectionId = selected.id;
+    const connection = await connectServer(selected);
     const appTools = Array.from(connection.tools.values()).filter((tool) =>
       getToolUiResourceUri(tool),
     );
@@ -279,14 +395,16 @@ async function addOrSaveGadget() {
   if (!args) return;
 
   try {
-    const connection = await connectServer(selectedServerUrl);
+    if (!selectedConnectionId) throw new Error('Discover an MCP connection first.');
+    const connectionConfig = connectionById(selectedConnectionId);
+    const connection = await connectServer(connectionConfig);
     const tool = connection.tools.get(toolSelect.value);
     if (!tool) throw new Error(`Unknown tool: ${toolSelect.value}`);
 
     if (editingGadgetId) {
       const config = gadgetDocument.gadgets.find((gadget) => gadget.id === editingGadgetId);
       if (!config) throw new Error('The gadget being edited no longer exists.');
-      config.serverUrl = selectedServerUrl;
+      config.connectionId = selectedConnectionId;
       config.toolName = tool.name;
       config.title = titleInput.value || tool.title || tool.name;
       config.arguments = args;
@@ -300,7 +418,7 @@ async function addOrSaveGadget() {
 
     const config: GadgetConfig = {
       id: newGadgetId(),
-      serverUrl: selectedServerUrl,
+      connectionId: selectedConnectionId,
       toolName: tool.name,
       title: titleInput.value || tool.title || tool.name,
       arguments: args,
@@ -326,8 +444,10 @@ cancelEditButton.addEventListener('click', () => {
 
 async function editGadget(config: GadgetConfig) {
   editingGadgetId = config.id;
-  serverUrlInput.value = config.serverUrl;
-  selectedServerUrl = config.serverUrl;
+  const connection = connectionById(config.connectionId);
+  serverUrlInput.value = connection.serverUrl;
+  authModeInput.value = connection.auth.type;
+  selectedConnectionId = connection.id;
   titleInput.value = config.title;
   argumentsInput.value = JSON.stringify(config.arguments, undefined, 2);
   addButton.textContent = 'Save changes';
@@ -358,7 +478,7 @@ async function duplicateGadget(config: GadgetConfig) {
 }
 
 async function retryGadget(config: GadgetConfig) {
-  connections.delete(new URL(config.serverUrl).href);
+  runtimeConnections.delete(config.connectionId);
   await rerenderDocument();
   setStatus(`Retried ${config.title}.`);
 }
@@ -560,10 +680,13 @@ async function renderGadget(config: GadgetConfig) {
   });
 
   try {
-    const connection = await connectServer(config.serverUrl);
+    const connectionConfig = connectionById(config.connectionId);
+    const connection = await connectServer(connectionConfig);
     const tool = connection.tools.get(config.toolName);
     if (!tool) {
-      throw new Error(`Tool ${config.toolName} is no longer advertised by ${config.serverUrl}.`);
+      throw new Error(
+        `Tool ${config.toolName} is no longer advertised by ${connectionConfig.serverUrl}.`,
+      );
     }
     await mountAppTile(tile, connection, tool, config.arguments);
     setTileState(state, 'ready');
@@ -736,4 +859,22 @@ async function restoreDocument() {
   setStatus(`Restored ${gadgetDocument.gadgets.length} gadget(s).`);
 }
 
-void restoreDocument();
+async function boot() {
+  const callback = oauthCallback();
+  if (callback) {
+    const connection = gadgetDocument.connections.find(
+      (candidate) => candidate.id === callback.connectionId,
+    );
+    if (connection) {
+      serverUrlInput.value = connection.serverUrl;
+      authModeInput.value = connection.auth.type;
+      selectedConnectionId = connection.id;
+      await discoverApps();
+      setStatus(`Connected to ${connection.displayName} with OAuth.`);
+      return;
+    }
+  }
+  await restoreDocument();
+}
+
+void boot();

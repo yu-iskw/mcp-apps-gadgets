@@ -11,7 +11,10 @@ import type { Request, Response } from 'express';
 
 const port = Number(process.env.PORT ?? 3002);
 const app = createMcpExpressApp({ host: '0.0.0.0' });
-const authorizationCodes = new Map<string, { clientId: string; redirectUri: string; challenge?: string }>();
+const authorizationCodes = new Map<
+  string,
+  { clientId: string; redirectUri: string; challenge?: string }
+>();
 const accessTokens = new Set<string>();
 
 function origin(req: Request) {
@@ -57,8 +60,10 @@ app.get('/authorize', (req: Request, res: Response) => {
   const clientId = String(req.query.client_id ?? '');
   const redirectUri = String(req.query.redirect_uri ?? '');
   const state = String(req.query.state ?? '');
-  const challenge = typeof req.query.code_challenge === 'string' ? req.query.code_challenge : undefined;
-  if (!clientId || !redirectUri) return void res.status(400).send('Missing OAuth client parameters');
+  const challenge =
+    typeof req.query.code_challenge === 'string' ? req.query.code_challenge : undefined;
+  if (!clientId || !redirectUri)
+    return void res.status(400).send('Missing OAuth client parameters');
   const code = crypto.randomUUID();
   authorizationCodes.set(code, { clientId, redirectUri, challenge });
   const callback = new URL(redirectUri);
@@ -71,7 +76,12 @@ app.post('/token', (req: Request, res: Response) => {
   if (req.body?.grant_type === 'refresh_token') {
     const token = crypto.randomUUID();
     accessTokens.add(token);
-    return void res.json({ access_token: token, token_type: 'Bearer', expires_in: 3600, scope: 'mcp' });
+    return void res.json({
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'mcp',
+    });
   }
   const code = String(req.body?.code ?? '');
   const verifier = String(req.body?.code_verifier ?? '');
@@ -80,7 +90,9 @@ app.post('/token', (req: Request, res: Response) => {
     return void res.status(400).json({ error: 'invalid_grant' });
   }
   if (pending.challenge && base64urlSha256(verifier) !== pending.challenge) {
-    return void res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+    return void res
+      .status(400)
+      .json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
   }
   authorizationCodes.delete(code);
   const token = crypto.randomUUID();
@@ -97,13 +109,23 @@ app.all('/mcp', async (req: Request, res: Response) => {
   }
   const server = createServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  res.on('close', () => { void transport.close(); void server.close(); });
+  res.on('close', () => {
+    void transport.close();
+    void server.close();
+  });
   try {
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error(error);
-    if (!res.headersSent) res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
+    if (!res.headersSent)
+      res
+        .status(500)
+        .json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        });
   }
 });
 

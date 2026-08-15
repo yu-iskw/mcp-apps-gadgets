@@ -112,6 +112,12 @@ The sandbox reduces View risk, but it does not make arbitrary MCP endpoints trus
 - gadget document schema validation and migration;
 - quotas, timeouts, cancellation, and resource lifecycle limits.
 
+## Current experiment: MCP Connections v1
+
+The workspace now separates gadgets from MCP server connections. A connection owns endpoint trust and authentication mode; gadgets reference a `connectionId`. Existing v1 documents that embedded `serverUrl` in each gadget are migrated on load.
+
+OAuth credentials are intentionally session-local and are never written to the exported workspace document. The host uses the MCP TypeScript SDK OAuth provider flow with PKCE and dynamic client registration. The Compose topology includes a second OAuth-protected MCP Apps server to prove that multiple gadgets can reuse one authenticated connection without host UI integration code for that app.
+
 ## Next experiment
 
-Add layout editing (drag, resize, responsive breakpoints) without introducing tile-type-specific UI code. The acceptance criterion should remain: a new MCP App server can add a completely new tile UI without changing the host runtime.
+Validate the generic connection abstraction against a real external OAuth-protected MCP Apps server, then harden endpoint registration, token storage, auditability, and policy based on the observed integration requirements.
