@@ -5,6 +5,7 @@ services:
       dockerfile: packages/gadget-host/Dockerfile
     ports:
       - "8080:8080"
+      - "8081:8081"
     depends_on:
       - demo-mcp-app
 
@@ -16,3 +17,14 @@ services:
       PORT: "3001"
     ports:
       - "3001:3001"
+
+  e2e:
+    profiles: ["e2e"]
+    build:
+      context: .
+      dockerfile: tests/e2e/Dockerfile
+    environment:
+      BASE_URL: "http://gadget-host:8080"
+    depends_on:
+      - gadget-host
+      - demo-mcp-app
