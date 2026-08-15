@@ -23,6 +23,5 @@ overrides:
   tar: 7.5.22
   # GHSA-rgw5-rvv9-x895 fixed in 5.0.9+
   brace-expansion: 5.0.9
-  # GHSA-2v37-7h3g-55p8: use the patched 5.x line because the current OSV scanner
-  # incorrectly flags the also-patched 3.3.17 release.
-  nanoid: 5.1.6
+  # Nano ID 5.1.16 includes the zero-size and negative-size infinite-loop fixes.
+  nanoid: 5.1.16
