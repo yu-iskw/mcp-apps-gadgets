@@ -11,7 +11,6 @@ import {
 } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-
 import type { CallToolResult, Resource, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 const hostInfo = { name: 'mcp-app-gadgets', version: '0.3.0' };
@@ -52,6 +51,73 @@ interface UiResourceData {
   permissions?: McpUiResourcePermissions;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseLayout(value: unknown): GadgetLayout | undefined {
+  if (!isRecord(value)) return undefined;
+  const layout: GadgetLayout = {};
+  if (typeof value.columns === 'number' && Number.isFinite(value.columns)) {
+    layout.columns = value.columns;
+  }
+  if (typeof value.height === 'number' && Number.isFinite(value.height)) {
+    layout.height = value.height;
+  }
+  return layout;
+}
+
+function parseGadget(value: unknown): GadgetConfig | undefined {
+  if (!isRecord(value) || !isRecord(value.arguments)) return undefined;
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.serverUrl !== 'string' ||
+    typeof value.toolName !== 'string' ||
+    typeof value.title !== 'string'
+  ) {
+    return undefined;
+  }
+  return {
+    id: value.id,
+    serverUrl: value.serverUrl,
+    toolName: value.toolName,
+    title: value.title,
+    arguments: value.arguments,
+    layout: parseLayout(value.layout),
+  };
+}
+
+function parseDocument(raw: string): GadgetDocument {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.gadgets)) {
+    throw new Error('Unsupported gadget document');
+  }
+  return {
+    version: 1,
+    gadgets: parsed.gadgets.flatMap((value) => {
+      const gadget = parseGadget(value);
+      return gadget ? [gadget] : [];
+    }),
+  };
+}
+
+function readUiMetadata(value: unknown): Pick<UiResourceData, 'csp' | 'permissions'> | undefined {
+  if (!isRecord(value)) return undefined;
+  const metadata = isRecord(value._meta) ? value._meta : isRecord(value.meta) ? value.meta : undefined;
+  if (!metadata || !isRecord(metadata.ui)) return undefined;
+
+  const result: Pick<UiResourceData, 'csp' | 'permissions'> = {};
+  if (isRecord(metadata.ui.csp)) result.csp = metadata.ui.csp as McpUiResourceCsp;
+  if (isRecord(metadata.ui.permissions)) {
+    result.permissions = metadata.ui.permissions as McpUiResourcePermissions;
+  }
+  return result;
+}
+
+function messageMethod(value: unknown): string | undefined {
+  return isRecord(value) && typeof value.method === 'string' ? value.method : undefined;
+}
+
 const serverUrlInput = document.querySelector<HTMLInputElement>('#server-url')!;
 const connectButton = document.querySelector<HTMLButtonElement>('#connect')!;
 const toolSelect = document.querySelector<HTMLSelectElement>('#tool')!;
@@ -73,11 +139,7 @@ function setStatus(message: string) {
 function loadDocument(): GadgetDocument {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { version: 1, gadgets: [] };
-    const parsed = JSON.parse(raw) as GadgetDocument;
-    if (parsed.version !== 1 || !Array.isArray(parsed.gadgets))
-      throw new Error('Unsupported gadget document');
-    return parsed;
+    return raw ? parseDocument(raw) : { version: 1, gadgets: [] };
   } catch (error) {
     console.warn('Could not restore gadget document', error);
     return { version: 1, gadgets: [] };
@@ -120,7 +182,7 @@ async function connectServer(serverUrl: string): Promise<ServerConnection> {
   return pending;
 }
 
-connectButton.addEventListener('click', async () => {
+async function discoverApps() {
   try {
     setStatus('Discovering…');
     selectedServerUrl = new URL(serverUrlInput.value).href;
@@ -141,14 +203,20 @@ connectButton.addEventListener('click', async () => {
   } catch (error) {
     setStatus(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+connectButton.addEventListener('click', () => {
+  void discoverApps();
 });
 
-addButton.addEventListener('click', async () => {
+async function addGadget() {
   let args: Record<string, unknown>;
   try {
-    args = JSON.parse(argumentsInput.value) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(argumentsInput.value);
+    if (!isRecord(parsed)) throw new Error('Arguments must be a JSON object.');
+    args = parsed;
   } catch {
-    setStatus('Arguments must be valid JSON.');
+    setStatus('Arguments must be a valid JSON object.');
     return;
   }
 
@@ -166,11 +234,15 @@ addButton.addEventListener('click', async () => {
     };
     gadgetDocument.gadgets.push(config);
     saveDocument();
-    await renderGadget(config, true);
+    await renderGadget(config);
     setStatus(`Added ${tool.name}.`);
   } catch (error) {
     setStatus(`Could not add gadget: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+addButton.addEventListener('click', () => {
+  void addGadget();
 });
 
 function applyLayout(tile: HTMLElement, config: GadgetConfig) {
@@ -214,7 +286,6 @@ function enableReordering(tile: HTMLElement, header: HTMLElement, config: Gadget
     const toIndex = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === config.id);
     if (fromIndex < 0 || toIndex < 0) return;
     const [moved] = gadgetDocument.gadgets.splice(fromIndex, 1);
-    if (!moved) return;
     gadgetDocument.gadgets.splice(toIndex, 0, moved);
     saveDocument();
     const movedTile = grid.querySelector<HTMLElement>(`[data-gadget-id="${CSS.escape(moved.id)}"]`);
@@ -273,7 +344,7 @@ function enableResizing(tile: HTMLElement, config: GadgetConfig) {
   });
 }
 
-async function renderGadget(config: GadgetConfig, prepend = false) {
+async function renderGadget(config: GadgetConfig) {
   const tile = document.createElement('article');
   tile.className = 'tile';
   tile.dataset.gadgetId = config.id;
@@ -286,12 +357,13 @@ async function renderGadget(config: GadgetConfig, prepend = false) {
   remove.textContent = 'Remove';
   tileHeader.append(heading, remove);
   tile.append(tileHeader);
-  prepend ? grid.prepend(tile) : grid.append(tile);
+  grid.append(tile);
   enableReordering(tile, tileHeader, config);
   enableResizing(tile, config);
 
   remove.addEventListener('click', () => {
-    gadgetDocument.gadgets = gadgetDocument.gadgets.filter((gadget) => gadget.id !== config.id);
+    const index = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === config.id);
+    if (index >= 0) gadgetDocument.gadgets.splice(index, 1);
     saveDocument();
     tile.remove();
   });
@@ -299,8 +371,9 @@ async function renderGadget(config: GadgetConfig, prepend = false) {
   try {
     const connection = await connectServer(config.serverUrl);
     const tool = connection.tools.get(config.toolName);
-    if (!tool)
+    if (!tool) {
       throw new Error(`Tool ${config.toolName} is no longer advertised by ${config.serverUrl}.`);
+    }
     await mountAppTile(tile, connection, tool, config.arguments);
   } catch (error) {
     const fallback = document.createElement('div');
@@ -313,16 +386,17 @@ async function renderGadget(config: GadgetConfig, prepend = false) {
 async function getUiResource(connection: ServerConnection, uri: string): Promise<UiResourceData> {
   const response = await connection.client.readResource({ uri });
   const content = response.contents[0];
-  if (!content || content.mimeType !== RESOURCE_MIME_TYPE) {
+  if (content.mimeType !== RESOURCE_MIME_TYPE) {
     throw new Error(`Expected ${RESOURCE_MIME_TYPE} from ${uri}.`);
   }
   const html = 'blob' in content ? atob(content.blob) : content.text;
-  const contentMeta =
-    (content as { _meta?: { ui?: UiResourceData }; meta?: { ui?: UiResourceData } })._meta ??
-    (content as { meta?: { ui?: UiResourceData } }).meta;
-  const listingMeta = connection.resources.get(uri)?._meta;
-  const ui = contentMeta?.ui ?? listingMeta?.ui;
-  return { html, csp: ui?.csp, permissions: ui?.permissions };
+  const contentUi = readUiMetadata(content);
+  const listingUi = readUiMetadata(connection.resources.get(uri));
+  return {
+    html,
+    csp: contentUi?.csp ?? listingUi?.csp,
+    permissions: contentUi?.permissions ?? listingUi?.permissions,
+  };
 }
 
 function sandboxUrl(csp?: McpUiResourceCsp) {
@@ -347,8 +421,8 @@ async function loadSandboxProxy(
       () => reject(new Error('Sandbox proxy did not become ready.')),
       10_000,
     );
-    const listener = (event: MessageEvent) => {
-      if (event.source === iframe.contentWindow && event.data?.method === readyMethod) {
+    const listener = (event: MessageEvent<unknown>) => {
+      if (event.source === iframe.contentWindow && messageMethod(event.data) === readyMethod) {
         window.clearTimeout(timeout);
         window.removeEventListener('message', listener);
         resolve();
@@ -398,15 +472,15 @@ async function mountAppTile(
       },
     },
   );
-  bridge.onopenlink = async ({ url }) => {
+  bridge.onopenlink = ({ url }) => {
     window.open(url, '_blank', 'noopener,noreferrer');
-    return {};
+    return Promise.resolve({});
   };
-  bridge.onsizechange = async ({ height }) => {
+  bridge.onsizechange = ({ height }) => {
     if (height) iframe.style.height = `${Math.max(120, height)}px`;
   };
-  bridge.onmessage = async () => ({});
-  bridge.onupdatemodelcontext = async () => ({});
+  bridge.onmessage = () => Promise.resolve({});
+  bridge.onupdatemodelcontext = () => Promise.resolve({});
 
   const initialized = new Promise<void>((resolve) => {
     const previous = bridge.oninitialized;
@@ -417,17 +491,20 @@ async function mountAppTile(
     };
   });
   await bridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!));
-  await bridge.sendSandboxResourceReady({
+  bridge.sendSandboxResourceReady({
     html: ui.html,
     csp: ui.csp,
     permissions: ui.permissions,
   });
   await initialized;
   bridge.sendToolInput({ arguments: args });
-  resultPromise.then(
-    (result) => bridge.sendToolResult(result),
-    (error) =>
-      bridge.sendToolCancelled({ reason: error instanceof Error ? error.message : String(error) }),
+  void resultPromise.then(
+    (result) => {
+      bridge.sendToolResult(result);
+    },
+    (error) => {
+      bridge.sendToolCancelled({ reason: error instanceof Error ? error.message : String(error) });
+    },
   );
 
   removeBridgeOnTileRemoval(tile, bridge);
@@ -437,7 +514,7 @@ function removeBridgeOnTileRemoval(tile: HTMLElement, bridge: AppBridge) {
   const observer = new MutationObserver(() => {
     if (!document.contains(tile)) {
       observer.disconnect();
-      bridge.close().catch(() => undefined);
+      void bridge.close();
     }
   });
   observer.observe(grid, { childList: true });
