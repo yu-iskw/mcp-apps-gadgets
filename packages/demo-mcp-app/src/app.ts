@@ -16,17 +16,24 @@ const title = document.querySelector<HTMLElement>("#title")!;
 const value = document.querySelector<HTMLElement>("#value")!;
 const unit = document.querySelector<HTMLElement>("#unit")!;
 
-function render(input: Record<string, unknown> | undefined) {
-  if (!input) return;
-  title.textContent = String(input.title ?? "Metric");
-  value.textContent = String(input.value ?? "—");
-  unit.textContent = String(input.unit ?? "");
+function displayValue(input: unknown, fallback: string): string {
+  if (typeof input === "string" || typeof input === "number") {
+    return String(input);
+  }
+  return fallback;
 }
 
-app.ontoolinput = ({ arguments: args }) => render(args as Record<string, unknown>);
+function render(input: Record<string, unknown> | undefined) {
+  if (!input) return;
+  title.textContent = displayValue(input.title, "Metric");
+  value.textContent = displayValue(input.value, "—");
+  unit.textContent = displayValue(input.unit, "");
+}
+
+app.ontoolinput = ({ arguments: args }) => render(args);
 app.ontoolresult = (result) => {
-  if (result.structuredContent) render(result.structuredContent as Record<string, unknown>);
+  if (result.structuredContent) render(result.structuredContent);
 };
 app.onhostcontextchanged = () => undefined;
-app.onteardown = async () => ({});
+app.onteardown = () => Promise.resolve({});
 await app.connect();
