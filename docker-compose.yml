@@ -34,7 +34,9 @@ services:
       context: .
       dockerfile: tests/e2e/Dockerfile
     environment:
-      BASE_URL: http://gadget-host:8080
+      BASE_URL: http://localhost:8080
+      GADGET_HOST: gadget-host
+      GADGET_HOST_PORT: 8080
     depends_on:
       - gadget-host
       - demo-mcp-app
