@@ -22,11 +22,13 @@ declare global {
   }
 }
 
-const hostInfo = { name: 'mcp-app-gadgets', version: '0.3.0' };
+const hostInfo = { name: 'mcp-app-gadgets', version: '0.4.0' };
 const STORAGE_KEY = 'mcp-app-gadgets.document.v1';
 const GRID_COLUMNS = 12;
 const DEFAULT_COLUMNS = 6;
 const MIN_TILE_HEIGHT = 180;
+
+type GadgetState = 'loading' | 'ready' | 'error';
 
 interface GadgetLayout {
   columns?: number;
@@ -130,12 +132,23 @@ function messageMethod(value: unknown): string | undefined {
   return isRecord(value) && typeof value.method === 'string' ? value.method : undefined;
 }
 
+function newGadgetId(): string {
+  return Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
+    value.toString(16).padStart(8, '0'),
+  ).join('');
+}
+
+const composer = document.querySelector<HTMLElement>('#composer')!;
 const serverUrlInput = document.querySelector<HTMLInputElement>('#server-url')!;
 const connectButton = document.querySelector<HTMLButtonElement>('#connect')!;
 const toolSelect = document.querySelector<HTMLSelectElement>('#tool')!;
 const titleInput = document.querySelector<HTMLInputElement>('#tile-title')!;
 const argumentsInput = document.querySelector<HTMLTextAreaElement>('#arguments')!;
 const addButton = document.querySelector<HTMLButtonElement>('#add')!;
+const cancelEditButton = document.querySelector<HTMLButtonElement>('#cancel-edit')!;
+const exportButton = document.querySelector<HTMLButtonElement>('#export-workspace')!;
+const importButton = document.querySelector<HTMLButtonElement>('#import-workspace')!;
+const importFileInput = document.querySelector<HTMLInputElement>('#import-file')!;
 const status = document.querySelector<HTMLOutputElement>('#status')!;
 const grid = document.querySelector<HTMLElement>('#grid')!;
 
@@ -143,6 +156,7 @@ const connections = new Map<string, Promise<ServerConnection>>();
 let selectedServerUrl = serverUrlInput.value;
 const gadgetDocument = loadDocument();
 let draggedGadgetId: string | undefined;
+let editingGadgetId: string | undefined;
 
 function setStatus(message: string) {
   status.textContent = message;
@@ -167,6 +181,23 @@ function updateGadgetLayout(id: string, layout: GadgetLayout) {
   if (!gadget) return;
   gadget.layout = { ...gadget.layout, ...layout };
   saveDocument();
+}
+
+function cancelEditing() {
+  editingGadgetId = undefined;
+  addButton.textContent = 'Add gadget';
+  cancelEditButton.hidden = true;
+}
+
+function parseArgumentsInput(): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(argumentsInput.value);
+    if (!isRecord(parsed)) throw new Error('Arguments must be a JSON object.');
+    return parsed;
+  } catch {
+    setStatus('Arguments must be a valid JSON object.');
+    return undefined;
+  }
 }
 
 async function listAllTools(client: Client): Promise<Tool[]> {
@@ -213,7 +244,7 @@ async function connectServer(serverUrl: string): Promise<ServerConnection> {
   return pending;
 }
 
-async function discoverApps() {
+async function discoverApps(preferredTool?: string) {
   try {
     setStatus('Discovering…');
     selectedServerUrl = new URL(serverUrlInput.value).href;
@@ -226,6 +257,9 @@ async function discoverApps() {
     );
     toolSelect.disabled = appTools.length === 0;
     addButton.disabled = appTools.length === 0;
+    if (preferredTool && appTools.some((tool) => tool.name === preferredTool)) {
+      toolSelect.value = preferredTool;
+    }
     setStatus(
       appTools.length
         ? `Discovered ${appTools.length} MCP App tool(s).`
@@ -240,25 +274,32 @@ connectButton.addEventListener('click', () => {
   void discoverApps();
 });
 
-async function addGadget() {
-  let args: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(argumentsInput.value);
-    if (!isRecord(parsed)) throw new Error('Arguments must be a JSON object.');
-    args = parsed;
-  } catch {
-    setStatus('Arguments must be a valid JSON object.');
-    return;
-  }
+async function addOrSaveGadget() {
+  const args = parseArgumentsInput();
+  if (!args) return;
 
   try {
     const connection = await connectServer(selectedServerUrl);
     const tool = connection.tools.get(toolSelect.value);
     if (!tool) throw new Error(`Unknown tool: ${toolSelect.value}`);
+
+    if (editingGadgetId) {
+      const config = gadgetDocument.gadgets.find((gadget) => gadget.id === editingGadgetId);
+      if (!config) throw new Error('The gadget being edited no longer exists.');
+      config.serverUrl = selectedServerUrl;
+      config.toolName = tool.name;
+      config.title = titleInput.value || tool.title || tool.name;
+      config.arguments = args;
+      saveDocument();
+      const title = config.title;
+      cancelEditing();
+      await rerenderDocument();
+      setStatus(`Saved ${title}.`);
+      return;
+    }
+
     const config: GadgetConfig = {
-      id: Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
-        value.toString(16).padStart(8, '0'),
-      ).join(''),
+      id: newGadgetId(),
       serverUrl: selectedServerUrl,
       toolName: tool.name,
       title: titleInput.value || tool.title || tool.name,
@@ -270,12 +311,92 @@ async function addGadget() {
     await renderGadget(config);
     setStatus(`Added ${tool.name}.`);
   } catch (error) {
-    setStatus(`Could not add gadget: ${error instanceof Error ? error.message : String(error)}`);
+    setStatus(`Could not save gadget: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 addButton.addEventListener('click', () => {
-  void addGadget();
+  void addOrSaveGadget();
+});
+
+cancelEditButton.addEventListener('click', () => {
+  cancelEditing();
+  setStatus('Edit cancelled.');
+});
+
+async function editGadget(config: GadgetConfig) {
+  editingGadgetId = config.id;
+  serverUrlInput.value = config.serverUrl;
+  selectedServerUrl = config.serverUrl;
+  titleInput.value = config.title;
+  argumentsInput.value = JSON.stringify(config.arguments, undefined, 2);
+  addButton.textContent = 'Save changes';
+  cancelEditButton.hidden = false;
+  await discoverApps(config.toolName);
+  composer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  titleInput.focus();
+  setStatus(`Editing ${config.title}.`);
+}
+
+async function duplicateGadget(config: GadgetConfig) {
+  const index = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === config.id);
+  const duplicate: GadgetConfig = {
+    ...config,
+    id: newGadgetId(),
+    title: `${config.title} copy`,
+    arguments: structuredClone(config.arguments),
+    layout: config.layout ? { ...config.layout } : undefined,
+  };
+  gadgetDocument.gadgets.splice(
+    index < 0 ? gadgetDocument.gadgets.length : index + 1,
+    0,
+    duplicate,
+  );
+  saveDocument();
+  await rerenderDocument();
+  setStatus(`Duplicated ${config.title}.`);
+}
+
+async function retryGadget(config: GadgetConfig) {
+  connections.delete(new URL(config.serverUrl).href);
+  await rerenderDocument();
+  setStatus(`Retried ${config.title}.`);
+}
+
+function exportWorkspace() {
+  const blob = new Blob([`${JSON.stringify(gadgetDocument, undefined, 2)}\n`], {
+    type: 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'mcp-app-gadgets-workspace.json';
+  anchor.click();
+  URL.revokeObjectURL(url);
+  setStatus(`Exported ${gadgetDocument.gadgets.length} gadget(s).`);
+}
+
+exportButton.addEventListener('click', exportWorkspace);
+importButton.addEventListener('click', () => importFileInput.click());
+importFileInput.addEventListener('change', () => {
+  const file = importFileInput.files?.[0];
+  if (!file) return;
+  void file
+    .text()
+    .then(async (raw) => {
+      const imported = parseDocument(raw);
+      gadgetDocument.gadgets.splice(0, gadgetDocument.gadgets.length, ...imported.gadgets);
+      saveDocument();
+      cancelEditing();
+      await rerenderDocument();
+      setStatus(`Imported ${gadgetDocument.gadgets.length} gadget(s).`);
+    })
+    .catch((error) => {
+      setStatus(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+    })
+    .finally(() => {
+      importFileInput.value = '';
+    });
 });
 
 function applyLayout(tile: HTMLElement, config: GadgetConfig) {
@@ -287,18 +408,18 @@ function applyLayout(tile: HTMLElement, config: GadgetConfig) {
   );
 }
 
-function enableReordering(tile: HTMLElement, header: HTMLElement, config: GadgetConfig) {
-  header.draggable = true;
-  header.classList.add('drag-handle');
-  header.title = 'Drag to reorder';
+function enableReordering(tile: HTMLElement, handle: HTMLElement, config: GadgetConfig) {
+  handle.draggable = true;
+  handle.classList.add('drag-handle');
+  handle.title = 'Drag to reorder';
 
-  header.addEventListener('dragstart', (event) => {
+  handle.addEventListener('dragstart', (event) => {
     draggedGadgetId = config.id;
     tile.classList.add('dragging');
     event.dataTransfer?.setData('text/plain', config.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   });
-  header.addEventListener('dragend', () => {
+  handle.addEventListener('dragend', () => {
     draggedGadgetId = undefined;
     tile.classList.remove('dragging');
     document
@@ -377,28 +498,65 @@ function enableResizing(tile: HTMLElement, config: GadgetConfig) {
   });
 }
 
+function actionButton(label: string, className: string) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.textContent = label;
+  button.draggable = false;
+  return button;
+}
+
+function setTileState(element: HTMLElement, state: GadgetState, message?: string) {
+  element.dataset.state = state;
+  element.textContent = message ?? state[0].toUpperCase() + state.slice(1);
+}
+
 async function renderGadget(config: GadgetConfig) {
   const tile = document.createElement('article');
   tile.className = 'tile';
   tile.dataset.gadgetId = config.id;
   applyLayout(tile, config);
+
   const tileHeader = document.createElement('header');
+  const titleArea = document.createElement('div');
+  titleArea.className = 'tile-title-area';
   const heading = document.createElement('h2');
   heading.textContent = config.title;
-  const remove = document.createElement('button');
-  remove.className = 'remove';
-  remove.textContent = 'Remove';
-  tileHeader.append(heading, remove);
+  const state = document.createElement('span');
+  state.className = 'gadget-state';
+  setTileState(state, 'loading');
+  titleArea.append(heading, state);
+
+  const actions = document.createElement('div');
+  actions.className = 'tile-actions';
+  const edit = actionButton('Edit', 'edit');
+  const duplicate = actionButton('Duplicate', 'duplicate');
+  const retry = actionButton('Retry', 'retry');
+  const remove = actionButton('Remove', 'remove');
+  actions.append(edit, duplicate, retry, remove);
+  tileHeader.append(titleArea, actions);
   tile.append(tileHeader);
   grid.append(tile);
-  enableReordering(tile, tileHeader, config);
+  enableReordering(tile, titleArea, config);
   enableResizing(tile, config);
 
+  edit.addEventListener('click', () => {
+    void editGadget(config);
+  });
+  duplicate.addEventListener('click', () => {
+    void duplicateGadget(config);
+  });
+  retry.addEventListener('click', () => {
+    void retryGadget(config);
+  });
   remove.addEventListener('click', () => {
     const index = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === config.id);
     if (index >= 0) gadgetDocument.gadgets.splice(index, 1);
+    if (editingGadgetId === config.id) cancelEditing();
     saveDocument();
     tile.remove();
+    setStatus(`Removed ${config.title}.`);
   });
 
   try {
@@ -408,10 +566,14 @@ async function renderGadget(config: GadgetConfig) {
       throw new Error(`Tool ${config.toolName} is no longer advertised by ${config.serverUrl}.`);
     }
     await mountAppTile(tile, connection, tool, config.arguments);
+    setTileState(state, 'ready');
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setTileState(state, 'error', 'Error');
+    state.title = message;
     const fallback = document.createElement('div');
     fallback.className = 'fallback';
-    fallback.textContent = `Unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    fallback.textContent = `Unavailable: ${message}`;
     tile.append(fallback);
   }
 }
@@ -562,10 +724,15 @@ function removeBridgeOnTileRemoval(tile: HTMLElement, bridge: AppBridge) {
   observer.observe(grid, { childList: true });
 }
 
+async function rerenderDocument() {
+  grid.replaceChildren();
+  for (const gadget of gadgetDocument.gadgets) await renderGadget(gadget);
+}
+
 async function restoreDocument() {
   if (gadgetDocument.gadgets.length === 0) return;
   setStatus(`Restoring ${gadgetDocument.gadgets.length} gadget(s)…`);
-  for (const gadget of gadgetDocument.gadgets) await renderGadget(gadget);
+  await rerenderDocument();
   setStatus(`Restored ${gadgetDocument.gadgets.length} gadget(s).`);
 }
 

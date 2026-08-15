@@ -25,6 +25,10 @@ header {
   margin-bottom: 24px;
 }
 
+.page-header {
+  gap: 24px;
+}
+
 h1 {
   margin: 4px 0;
   font-size: clamp(2rem, 5vw, 4rem);
@@ -37,6 +41,14 @@ h1 {
   letter-spacing: 0.12em;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.workspace-actions,
+.composer-actions,
+.tile-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .composer {
@@ -125,13 +137,44 @@ button:disabled {
   padding: 12px 14px;
   border-bottom: 1px solid #ecece8;
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
 }
 
+.tile-title-area {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
 .tile h2 {
   margin: 0;
+  overflow: hidden;
   font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gadget-state {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ecece8;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gadget-state[data-state='ready'] {
+  background: #e3f4e8;
+}
+
+.gadget-state[data-state='error'] {
+  background: #f8e2e0;
 }
 
 .drag-handle {
@@ -140,6 +183,16 @@ button:disabled {
 
 .drag-handle:active {
   cursor: grabbing;
+}
+
+.tile-actions {
+  flex: none;
+}
+
+.tile-actions button {
+  border: 0;
+  padding: 4px 7px;
+  font-size: 0.72rem;
 }
 
 .tile iframe {
@@ -153,12 +206,6 @@ button:disabled {
 .tile .fallback {
   padding: 16px;
   white-space: pre-wrap;
-}
-
-.remove {
-  border: 0;
-  padding: 4px 8px;
-  cursor: pointer;
 }
 
 .resize-handle {
@@ -188,6 +235,11 @@ button:disabled {
 }
 
 @media (width <= 900px) {
+  .page-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
   .composer {
     grid-template-columns: 1fr;
   }
@@ -205,5 +257,14 @@ button:disabled {
 
   .tile {
     grid-column: 1 / -1 !important;
+  }
+
+  .tile header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .tile-actions {
+    flex-wrap: wrap;
   }
 }
