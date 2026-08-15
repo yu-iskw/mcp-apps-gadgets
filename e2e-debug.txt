@@ -1,0 +1,232 @@
+ Container mcp-apps-gadgets-demo-mcp-app-1  Recreate
+ Container mcp-apps-gadgets-oauth-demo-mcp-app-1  Recreate
+ Container mcp-apps-gadgets-demo-mcp-app-1  Recreated
+ Container mcp-apps-gadgets-oauth-demo-mcp-app-1  Recreated
+ Container mcp-apps-gadgets-gadget-host-1  Recreate
+ Container mcp-apps-gadgets-gadget-host-1  Recreated
+ Container mcp-apps-gadgets-oauth-demo-mcp-app-1  Starting
+ Container mcp-apps-gadgets-demo-mcp-app-1  Starting
+ Container mcp-apps-gadgets-oauth-demo-mcp-app-1  Started
+ Container mcp-apps-gadgets-demo-mcp-app-1  Started
+ Container mcp-apps-gadgets-gadget-host-1  Starting
+ Container mcp-apps-gadgets-gadget-host-1  Started
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.46kB done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 447B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for mcr.microsoft.com/playwright:v1.56.0-noble
+#3 DONE 0.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 77.17kB 0.0s done
+#5 DONE 0.0s
+
+#6 [1/8] FROM mcr.microsoft.com/playwright:v1.56.0-noble@sha256:35246d87a7c88ea9b771c65d33171b2611b02a8253b4b12ce6f94376c55f99f2
+#6 resolve mcr.microsoft.com/playwright:v1.56.0-noble@sha256:35246d87a7c88ea9b771c65d33171b2611b02a8253b4b12ce6f94376c55f99f2 0.0s done
+#6 sha256:35246d87a7c88ea9b771c65d33171b2611b02a8253b4b12ce6f94376c55f99f2 743B / 743B done
+#6 sha256:1e83c10ccee0065f527953861d176a828a31a84324688ecb03f11912296c8444 1.17kB / 1.17kB done
+#6 sha256:86e2829695532ecd3624885d15514a8ccb304fe46be05b9b561f0b0d4ae6f000 4.35kB / 4.35kB done
+#6 sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973 0B / 30.59MB 0.1s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 0B / 103.89MB 0.1s
+#6 sha256:87cc6596c9a9ac835ee36ccca414d7d8c08de77c69750f1cd797aa7a3ea1365b 0B / 1.96MB 0.1s
+#6 sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973 9.44MB / 30.59MB 0.3s
+#6 sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973 22.02MB / 30.59MB 0.5s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 18.87MB / 103.89MB 0.5s
+#6 sha256:87cc6596c9a9ac835ee36ccca414d7d8c08de77c69750f1cd797aa7a3ea1365b 1.96MB / 1.96MB 0.3s done
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 6.29MB / 786.07MB 0.5s
+#6 sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973 30.59MB / 30.59MB 0.6s done
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 33.55MB / 103.89MB 0.7s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 46.14MB / 103.89MB 0.9s
+#6 extracting sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 52.43MB / 103.89MB 1.0s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 66.06MB / 103.89MB 1.1s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 57.67MB / 786.07MB 1.1s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 92.27MB / 103.89MB 1.3s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 103.81MB / 103.89MB 1.5s
+#6 sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 103.89MB / 103.89MB 1.7s done
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 97.52MB / 786.07MB 1.8s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 145.75MB / 786.07MB 2.1s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 191.89MB / 786.07MB 2.4s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 248.51MB / 786.07MB 2.8s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 301.99MB / 786.07MB 3.1s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 355.47MB / 786.07MB 3.5s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 404.75MB / 786.07MB 3.8s
+#6 extracting sha256:02bf5e209e4a8620b3d6c1d9e8b04c945a6fa195dfe57e2b22732c0d68e55973 3.0s done
+#6 extracting sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 464.52MB / 786.07MB 4.2s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 520.09MB / 786.07MB 4.5s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 559.94MB / 786.07MB 4.7s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 615.51MB / 786.07MB 5.0s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 672.14MB / 786.07MB 5.5s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 722.47MB / 786.07MB 6.0s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 771.75MB / 786.07MB 6.2s
+#6 sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 786.07MB / 786.07MB 9.1s done
+#6 extracting sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 5.2s
+#6 extracting sha256:0583dec8dd1d9cd368d73edd8bc5a7db227c367fa4544c2d386e8b9c8c8edffb 7.4s done
+#6 extracting sha256:87cc6596c9a9ac835ee36ccca414d7d8c08de77c69750f1cd797aa7a3ea1365b
+#6 extracting sha256:87cc6596c9a9ac835ee36ccca414d7d8c08de77c69750f1cd797aa7a3ea1365b 0.0s done
+#6 extracting sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 0.1s
+#6 extracting sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 5.2s
+#6 extracting sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 10.3s
+#6 extracting sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 15.6s
+#6 extracting sha256:cfd5daa1002dadbe4ac4ebe69b259077eb0ddf83ddf4367b5472332f7e456068 17.5s done
+#6 DONE 32.8s
+
+#7 [2/8] WORKDIR /workspace
+#7 DONE 0.0s
+
+#8 [3/8] COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+#8 DONE 0.0s
+
+#9 [4/8] COPY packages ./packages
+#9 DONE 0.0s
+
+#10 [5/8] RUN corepack enable && pnpm install --frozen-lockfile
+#10 0.255 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz
+#10 1.333 Scope: all 5 workspace projects
+#10 1.546 Lockfile is up to date, resolution step is skipped
+#10 1.768 Progress: resolved 1, reused 0, downloaded 0, added 0
+#10 1.862 Packages: +435
+#10 1.862 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#10 2.257 
+#10 2.257    ╭───────────────────────────────────────────────╮
+#10 2.257    │                                               │
+#10 2.257    │      Update available! 11.1.2 → 11.21.0.      │
+#10 2.257    │     Changelog: https://pnpm.io/v/11.21.0      │
+#10 2.257    │   To update, run: corepack use pnpm@11.21.0   │
+#10 2.257    │                                               │
+#10 2.257    ╰───────────────────────────────────────────────╯
+#10 2.257 
+#10 2.772 Progress: resolved 435, reused 0, downloaded 27, added 4
+#10 3.772 Progress: resolved 435, reused 0, downloaded 131, added 38
+#10 4.775 Progress: resolved 435, reused 0, downloaded 183, added 54
+#10 5.776 Progress: resolved 435, reused 0, downloaded 316, added 109
+#10 6.777 Progress: resolved 435, reused 0, downloaded 431, added 250
+#10 6.956 Progress: resolved 435, reused 0, downloaded 431, added 435, done
+#10 7.211 .../node_modules/unrs-resolver postinstall$ napi-postinstall unrs-resolver 1.11.1 check
+#10 7.223 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#10 7.281 .../node_modules/unrs-resolver postinstall: Done
+#10 7.283 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#10 7.404 
+#10 7.404 devDependencies:
+#10 7.404 + @playwright/test 1.56.0
+#10 7.404 + @trunkio/launcher 1.3.4
+#10 7.404 + @typescript-eslint/eslint-plugin 8.59.1
+#10 7.404 + @typescript-eslint/parser 8.59.1
+#10 7.404 + @vitest/coverage-v8 4.1.3
+#10 7.404 + @vitest/eslint-plugin 1.6.16
+#10 7.404 + eslint 10.3.0
+#10 7.404 + eslint-import-resolver-typescript 4.4.4
+#10 7.404 + eslint-plugin-import-x 4.16.2
+#10 7.404 + eslint-plugin-security 4.0.0
+#10 7.404 + eslint-plugin-sonarjs 4.0.3
+#10 7.404 + eslint-plugin-unicorn 64.0.0
+#10 7.404 + knip 6.3.0
+#10 7.404 + prettier 3.8.1
+#10 7.404 + stylelint-config-standard 40.0.0
+#10 7.404 + typescript 5.9.3
+#10 7.404 + vite 8.0.16
+#10 7.404 + vitest 4.1.3
+#10 7.404 
+#10 7.439 Done in 6.6s using pnpm v11.1.2
+#10 DONE 8.3s
+
+#11 [6/8] COPY tests/e2e ./tests/e2e
+#11 DONE 0.0s
+
+#12 [7/8] RUN chown -R pwuser:pwuser /workspace
+#12 DONE 10.4s
+
+#13 [8/8] WORKDIR /workspace/tests/e2e
+#13 DONE 0.0s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 16.6s done
+#14 writing image sha256:2025433614536215f24def75f03b0624f00c0e0341a63fed94fd63c7bfe408e0 done
+#14 naming to docker.io/library/mcp-apps-gadgets-e2e done
+#14 DONE 16.6s
+
+#15 resolving provenance for metadata file
+#15 DONE 0.0s
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz
+
+Running 2 tests using 1 worker
+
+[1A[2K[1/2] gadgets.spec.ts:18:5 › manages and restores an MCP App gadget workspace
+[1A[2K  1) gadgets.spec.ts:18:5 › manages and restores an MCP App gadget workspace ───────────────────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mnot[2m.[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: not [32m"6"[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      42 |   await page.mouse.move(box.x + 260, box.y + box.height / 2, { steps: 5 });
+      43 |   await page.mouse.up();
+    > 44 |   await expect.poll(() => gadgetColumns(page, 0)).not.toBe('6');
+         |   ^
+      45 |   const resizedColumns = await gadgetColumns(page, 0);
+      46 |
+      47 |   await firstTile.locator('.duplicate').click();
+        at /workspace/tests/e2e/gadgets.spec.ts:44:3
+
+    Error Context: ../../test-results/gadgets-manages-and-restores-an-MCP-App-gadget-workspace/error-context.md
+
+
+[1A[2K[2/2] gadgets.spec.ts:112:5 › reuses one OAuth connection across multiple MCP App gadgets
+[1A[2K  2) gadgets.spec.ts:112:5 › reuses one OAuth connection across multiple MCP App gadgets ───────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#status')
+    Expected substring: [32m"Discovered 1 MCP App tool"[39m
+    Received string:    [31m"Connection failed: Cannot read properties of undefined (reading 'digest')"[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('#status')[22m
+    [2m    2 × locator resolved to <output id="status">Discovering…</output>[22m
+    [2m      - unexpected value "Discovering…"[22m
+    [2m    7 × locator resolved to <output id="status">Connection failed: Cannot read properties of unde…</output>[22m
+    [2m      - unexpected value "Connection failed: Cannot read properties of undefined (reading 'digest')"[22m
+
+
+      116 |   await page.locator('#connect').click();
+      117 |
+    > 118 |   await expect(page.locator('#status')).toContainText('Discovered 1 MCP App tool');
+          |                                         ^
+      119 |   await page.locator('#tile-title').fill('Protected revenue');
+      120 |   await page.locator('#arguments').fill(JSON.stringify({ title: 'Protected revenue', value: 101 }));
+      121 |   await page.locator('#add').click();
+        at /workspace/tests/e2e/gadgets.spec.ts:118:41
+
+    Error Context: ../../test-results/gadgets-reuses-one-OAuth-c-1119f-ss-multiple-MCP-App-gadgets/error-context.md
+
+
+[1A[2K  2 failed
+    gadgets.spec.ts:18:5 › manages and restores an MCP App gadget workspace ────────────────────────
+    gadgets.spec.ts:112:5 › reuses one OAuth connection across multiple MCP App gadgets ────────────
+
+oauth-demo-mcp-app-1  | ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz
+oauth-demo-mcp-app-1  | $ tsx main.ts
+oauth-demo-mcp-app-1  | Warning: Server is binding to 0.0.0.0 without DNS rebinding protection. Consider using the allowedHosts option to restrict allowed hosts, or use authentication to protect your server.
+oauth-demo-mcp-app-1  | OAuth demo MCP App: http://localhost:3002/mcp
+gadget-host-1         | ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz
+gadget-host-1         | $ node serve.mjs
+gadget-host-1         | Gadget host listening on 8080
+gadget-host-1         | Sandbox proxy listening on 8081
+demo-mcp-app-1        | ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-11.1.2.tgz
+demo-mcp-app-1        | $ tsx main.ts
+demo-mcp-app-1        | Warning: Server is binding to 0.0.0.0 without DNS rebinding protection. Consider using the allowedHosts option to restrict allowed hosts, or use authentication to protect your server.
+demo-mcp-app-1        | Demo MCP App: http://localhost:3001/mcp
