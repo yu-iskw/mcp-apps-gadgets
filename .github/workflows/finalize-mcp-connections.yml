@@ -31,20 +31,27 @@ jobs:
       - run: pnpm lint:eslint
       - run: pnpm knip
       - run: pnpm build
+      - name: Persist generated fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml packages/gadget-host/src/main.ts packages/gadget-host/src/oauth.ts packages/gadget-host/index.html packages/oauth-demo-mcp-app tests/e2e/gadgets.spec.ts tests/e2e/playwright.config.ts
+          git commit -m "fix: finalize OAuth connection lifecycle" || exit 0
+          git push origin HEAD:feat/mcp-connections-oauth
       - name: Run Compose E2E
         run: |
+          trap 'docker compose logs || true; docker compose down --volumes --remove-orphans || true' EXIT
           docker compose up -d --build gadget-host demo-mcp-app oauth-demo-mcp-app
           docker compose --profile e2e run --rm e2e
-          docker compose down --volumes --remove-orphans
       - name: Remove temporary diagnostics and finalizer
+        if: success()
         run: |
           rm -f eslint-debug.txt prettier-debug.txt e2e-debug.txt
           rm -f scripts/finalize-mcp-connections.py
           rm -f .github/workflows/finalize-mcp-connections.yml
-      - name: Commit validated fixes
+      - name: Commit cleanup
+        if: success()
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix: finalize OAuth connection lifecycle" || exit 0
+          git commit -m "chore: remove temporary CI diagnostics" || exit 0
           git push origin HEAD:feat/mcp-connections-oauth
