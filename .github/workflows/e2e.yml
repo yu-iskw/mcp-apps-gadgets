@@ -1,0 +1,36 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start gadget stack
+        run: docker compose up -d --build gadget-host demo-mcp-app
+      - name: Wait for host
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8080/ >/dev/null && curl --fail --silent http://localhost:8081/sandbox.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose logs
+          exit 1
+      - name: Run Playwright
+        run: docker compose --profile e2e run --rm e2e
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
