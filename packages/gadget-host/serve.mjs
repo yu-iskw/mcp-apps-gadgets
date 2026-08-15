@@ -87,9 +87,7 @@ createServer(async (request, response) => {
     const sandboxOrigin = sandboxOriginForRequest(request);
     response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
     response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    response.end(
-      `window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`,
-    );
+    response.end(`window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`);
     return;
   }
   if (url.pathname === '/sandbox.html') {
