@@ -6,5 +6,5 @@ COPY packages/gadget-host/package.json packages/gadget-host/package.json
 RUN pnpm install --filter @mcp-app-gadgets/host... --no-frozen-lockfile
 COPY packages/gadget-host packages/gadget-host
 RUN pnpm --filter @mcp-app-gadgets/host build
-EXPOSE 8080
+EXPOSE 8080 8081
 CMD ["pnpm", "--filter", "@mcp-app-gadgets/host", "start"]
