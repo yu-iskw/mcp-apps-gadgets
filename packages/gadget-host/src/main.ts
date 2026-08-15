@@ -13,12 +13,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult, Resource, Tool } from "@modelcontextprotocol/sdk/types.js";
 
-const hostInfo = { name: "mcp-app-gadgets", version: "0.2.0" };
+const hostInfo = { name: "mcp-app-gadgets", version: "0.3.0" };
 const STORAGE_KEY = "mcp-app-gadgets.document.v1";
 const SANDBOX_PORT = "8081";
+const GRID_COLUMNS = 12;
+const DEFAULT_COLUMNS = 6;
+const MIN_TILE_HEIGHT = 180;
 
 interface GadgetLayout {
-  width?: number;
+  columns?: number;
   height?: number;
 }
 
@@ -60,6 +63,7 @@ const grid = document.querySelector<HTMLElement>("#grid")!;
 const connections = new Map<string, Promise<ServerConnection>>();
 let selectedServerUrl = serverUrlInput.value;
 let gadgetDocument = loadDocument();
+let draggedGadgetId: string | undefined;
 
 function setStatus(message: string) {
   status.textContent = message;
@@ -80,6 +84,13 @@ function loadDocument(): GadgetDocument {
 
 function saveDocument() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(gadgetDocument));
+}
+
+function updateGadgetLayout(id: string, layout: GadgetLayout) {
+  const gadget = gadgetDocument.gadgets.find((candidate) => candidate.id === id);
+  if (!gadget) return;
+  gadget.layout = { ...gadget.layout, ...layout };
+  saveDocument();
 }
 
 async function connectServer(serverUrl: string): Promise<ServerConnection> {
@@ -138,6 +149,7 @@ addButton.addEventListener("click", async () => {
       toolName: tool.name,
       title: titleInput.value || tool.title || tool.name,
       arguments: args,
+      layout: { columns: DEFAULT_COLUMNS },
     };
     gadgetDocument.gadgets.push(config);
     saveDocument();
@@ -148,10 +160,103 @@ addButton.addEventListener("click", async () => {
   }
 });
 
+function applyLayout(tile: HTMLElement, config: GadgetConfig) {
+  const columns = Math.min(GRID_COLUMNS, Math.max(1, config.layout?.columns ?? DEFAULT_COLUMNS));
+  tile.style.setProperty("--gadget-columns", String(columns));
+  tile.style.setProperty("--gadget-height", `${Math.max(MIN_TILE_HEIGHT, config.layout?.height ?? MIN_TILE_HEIGHT)}px`);
+}
+
+function enableReordering(tile: HTMLElement, header: HTMLElement, config: GadgetConfig) {
+  header.draggable = true;
+  header.classList.add("drag-handle");
+  header.title = "Drag to reorder";
+
+  header.addEventListener("dragstart", (event) => {
+    draggedGadgetId = config.id;
+    tile.classList.add("dragging");
+    event.dataTransfer?.setData("text/plain", config.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  });
+  header.addEventListener("dragend", () => {
+    draggedGadgetId = undefined;
+    tile.classList.remove("dragging");
+    document.querySelectorAll(".tile.drag-over").forEach((element) => element.classList.remove("drag-over"));
+  });
+  tile.addEventListener("dragover", (event) => {
+    if (!draggedGadgetId || draggedGadgetId === config.id) return;
+    event.preventDefault();
+    tile.classList.add("drag-over");
+  });
+  tile.addEventListener("dragleave", () => tile.classList.remove("drag-over"));
+  tile.addEventListener("drop", (event) => {
+    event.preventDefault();
+    tile.classList.remove("drag-over");
+    if (!draggedGadgetId || draggedGadgetId === config.id) return;
+    const fromIndex = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === draggedGadgetId);
+    const toIndex = gadgetDocument.gadgets.findIndex((gadget) => gadget.id === config.id);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const [moved] = gadgetDocument.gadgets.splice(fromIndex, 1);
+    if (!moved) return;
+    gadgetDocument.gadgets.splice(toIndex, 0, moved);
+    saveDocument();
+    const movedTile = grid.querySelector<HTMLElement>(`[data-gadget-id="${CSS.escape(moved.id)}"]`);
+    if (movedTile) grid.insertBefore(movedTile, fromIndex < toIndex ? tile.nextSibling : tile);
+    setStatus("Gadget order saved.");
+  });
+}
+
+function enableResizing(tile: HTMLElement, config: GadgetConfig) {
+  const handle = document.createElement("button");
+  handle.className = "resize-handle";
+  handle.type = "button";
+  handle.setAttribute("aria-label", `Resize ${config.title}`);
+  handle.title = "Drag to resize";
+  tile.append(handle);
+
+  handle.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    tile.classList.add("resizing");
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startRect = tile.getBoundingClientRect();
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const width = Math.max(240, startRect.width + moveEvent.clientX - startX);
+      const height = Math.max(MIN_TILE_HEIGHT, startRect.height + moveEvent.clientY - startY);
+      tile.style.width = `${width}px`;
+      tile.style.height = `${height}px`;
+    };
+
+    const onEnd = (upEvent: PointerEvent) => {
+      handle.releasePointerCapture(upEvent.pointerId);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onEnd);
+      handle.removeEventListener("pointercancel", onEnd);
+      tile.classList.remove("resizing");
+      const gridWidth = grid.getBoundingClientRect().width;
+      const tileRect = tile.getBoundingClientRect();
+      const columns = Math.min(GRID_COLUMNS, Math.max(1, Math.round((tileRect.width / gridWidth) * GRID_COLUMNS)));
+      const height = Math.round(tileRect.height);
+      config.layout = { columns, height };
+      tile.style.removeProperty("width");
+      tile.style.removeProperty("height");
+      applyLayout(tile, config);
+      updateGadgetLayout(config.id, config.layout);
+      setStatus(`Saved ${config.title} layout (${columns}/12 columns).`);
+    };
+
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onEnd);
+    handle.addEventListener("pointercancel", onEnd);
+  });
+}
+
 async function renderGadget(config: GadgetConfig, prepend = false) {
   const tile = document.createElement("article");
   tile.className = "tile";
   tile.dataset.gadgetId = config.id;
+  applyLayout(tile, config);
   const tileHeader = document.createElement("header");
   const heading = document.createElement("h2");
   heading.textContent = config.title;
@@ -161,6 +266,8 @@ async function renderGadget(config: GadgetConfig, prepend = false) {
   tileHeader.append(heading, remove);
   tile.append(tileHeader);
   prepend ? grid.prepend(tile) : grid.append(tile);
+  enableReordering(tile, tileHeader, config);
+  enableResizing(tile, config);
 
   remove.addEventListener("click", () => {
     gadgetDocument.gadgets = gadgetDocument.gadgets.filter((gadget) => gadget.id !== config.id);
@@ -286,7 +393,7 @@ function removeBridgeOnTileRemoval(tile: HTMLElement, bridge: AppBridge) {
 async function restoreDocument() {
   if (gadgetDocument.gadgets.length === 0) return;
   setStatus(`Restoring ${gadgetDocument.gadgets.length} gadget(s)…`);
-  await Promise.all(gadgetDocument.gadgets.map((gadget) => renderGadget(gadget)));
+  for (const gadget of gadgetDocument.gadgets) await renderGadget(gadget);
   setStatus(`Restored ${gadgetDocument.gadgets.length} gadget(s).`);
 }
 
