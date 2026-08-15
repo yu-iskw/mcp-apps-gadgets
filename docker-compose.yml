@@ -1,0 +1,18 @@
+services:
+  gadget-host:
+    build:
+      context: .
+      dockerfile: packages/gadget-host/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - demo-mcp-app
+
+  demo-mcp-app:
+    build:
+      context: .
+      dockerfile: packages/demo-mcp-app/Dockerfile
+    environment:
+      PORT: "3001"
+    ports:
+      - "3001:3001"
