@@ -62,9 +62,9 @@ export function createServer() {
           unit: unit ?? '',
           refreshPolicy: effectivePolicy ?? 'static',
         },
-        // Opening a gadget always calls the tool, so on-open/manual get fresh
-        // authoritative data without a subscription. Only live gadgets declare
-        // an observable dependency and opt into background invalidation.
+        // Opening/restoring a gadget always calls the tool, so on-open and
+        // manual policies get authoritative state without background events.
+        // Live is the only policy that advertises an observable dependency.
         _meta:
           effectivePolicy === 'live'
             ? {
