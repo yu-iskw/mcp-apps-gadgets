@@ -1,8 +1,33 @@
 import {
   buildAllowAttribute,
+  type McpUiResourcePermissions,
   type McpUiSandboxProxyReadyNotification,
   type McpUiSandboxResourceReadyNotification,
 } from '@modelcontextprotocol/ext-apps/app-bridge';
+
+interface ResourceReadyPayload {
+  html?: string;
+  sandbox?: string;
+  permissions?: McpUiResourcePermissions;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseResourceReadyPayload(data: unknown): ResourceReadyPayload | undefined {
+  if (!isRecord(data) || data.method !== resourceReadyMethod || !isRecord(data.params)) {
+    return undefined;
+  }
+
+  const payload: ResourceReadyPayload = {};
+  if (typeof data.params.html === 'string') payload.html = data.params.html;
+  if (typeof data.params.sandbox === 'string') payload.sandbox = data.params.sandbox;
+  if (isRecord(data.params.permissions)) {
+    payload.permissions = data.params.permissions as McpUiResourcePermissions;
+  }
+  return payload;
+}
 
 if (window.self === window.top) throw new Error('Sandbox proxy must run inside an iframe.');
 if (!document.referrer) throw new Error('Missing embedding referrer.');
@@ -14,12 +39,14 @@ if (hostUrl.hostname !== window.location.hostname || hostUrl.port !== '8080') {
 }
 const ownOrigin = window.location.origin;
 
+let topIsAccessible = false;
 try {
-  window.top!.location.href;
+  topIsAccessible = typeof window.top?.location.href === 'string';
+} catch {
+  topIsAccessible = false;
+}
+if (topIsAccessible) {
   throw new Error('Sandbox isolation self-test failed: top window is accessible.');
-} catch (error) {
-  if (error instanceof Error && error.message.startsWith('Sandbox isolation self-test failed'))
-    throw error;
 }
 
 const inner = document.createElement('iframe');
@@ -32,31 +59,41 @@ const resourceReadyMethod: McpUiSandboxResourceReadyNotification['method'] =
 const proxyReadyMethod: McpUiSandboxProxyReadyNotification['method'] =
   'ui/notifications/sandbox-proxy-ready';
 
-window.addEventListener('message', (event) => {
-  if (event.source === window.parent) {
-    if (event.origin !== hostOrigin) return;
-    if (event.data?.method === resourceReadyMethod) {
-      const { html, sandbox, permissions } = event.data.params ?? {};
-      if (typeof sandbox === 'string') inner.setAttribute('sandbox', sandbox);
-      const allow = buildAllowAttribute(permissions);
-      if (allow) inner.setAttribute('allow', allow);
-      if (typeof html === 'string') {
-        const document = inner.contentDocument ?? inner.contentWindow?.document;
-        if (!document) throw new Error('Could not access inner sandbox document.');
-        document.open();
-        document.write(html);
-        document.close();
-      }
-      return;
-    }
-    inner.contentWindow?.postMessage(event.data, '*');
+function loadInnerResource(payload: ResourceReadyPayload) {
+  if (payload.sandbox) inner.setAttribute('sandbox', payload.sandbox);
+
+  const allow = buildAllowAttribute(payload.permissions);
+  if (allow) inner.setAttribute('allow', allow);
+
+  if (!payload.html) return;
+  const innerDocument = inner.contentDocument ?? inner.contentWindow?.document;
+  if (!innerDocument) throw new Error('Could not access inner sandbox document.');
+  innerDocument.open();
+  innerDocument.write(payload.html);
+  innerDocument.close();
+}
+
+function handleHostMessage(event: MessageEvent<unknown>) {
+  if (event.origin !== hostOrigin) return;
+  const payload = parseResourceReadyPayload(event.data);
+  if (payload) {
+    loadInnerResource(payload);
     return;
   }
+  inner.contentWindow?.postMessage(event.data, '*');
+}
 
-  if (event.source === inner.contentWindow) {
-    if (event.origin !== ownOrigin && event.origin !== 'null') return;
-    window.parent.postMessage(event.data, hostOrigin);
+function handleInnerMessage(event: MessageEvent<unknown>) {
+  if (event.origin !== ownOrigin && event.origin !== 'null') return;
+  window.parent.postMessage(event.data, hostOrigin);
+}
+
+window.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (event.source === window.parent) {
+    handleHostMessage(event);
+    return;
   }
+  if (event.source === inner.contentWindow) handleInnerMessage(event);
 });
 
 window.parent.postMessage(
