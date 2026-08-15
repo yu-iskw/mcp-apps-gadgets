@@ -1,10 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-async function addGadget(page, title: string, value: number) {
+async function addGadget(page: Page, title: string, value: number) {
+  const previousCount = await page.locator(".tile").count();
   await page.locator("#tile-title").fill(title);
   await page.locator("#arguments").fill(JSON.stringify({ title, value, unit: "req/min" }));
   await page.locator("#add").click();
-  await expect(page.locator(".tile")).toHaveCount(await page.locator(".tile").count());
+  await expect(page.locator(".tile")).toHaveCount(previousCount + 1);
 }
 
 test("discovers, renders, parameterizes, and restores MCP App gadgets", async ({ page }) => {
