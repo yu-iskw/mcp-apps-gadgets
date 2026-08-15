@@ -24,7 +24,7 @@ function parseResourceReadyPayload(data: unknown): ResourceReadyPayload | undefi
   if (typeof data.params.html === 'string') payload.html = data.params.html;
   if (typeof data.params.sandbox === 'string') payload.sandbox = data.params.sandbox;
   if (isRecord(data.params.permissions)) {
-    payload.permissions = data.params.permissions as McpUiResourcePermissions;
+    payload.permissions = data.params.permissions;
   }
   return payload;
 }

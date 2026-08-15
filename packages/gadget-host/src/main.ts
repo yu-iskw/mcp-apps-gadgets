@@ -11,6 +11,7 @@ import {
 } from '@modelcontextprotocol/ext-apps/app-bridge';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
 import type { CallToolResult, Resource, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 const hostInfo = { name: 'mcp-app-gadgets', version: '0.3.0' };
@@ -103,13 +104,17 @@ function parseDocument(raw: string): GadgetDocument {
 
 function readUiMetadata(value: unknown): Pick<UiResourceData, 'csp' | 'permissions'> | undefined {
   if (!isRecord(value)) return undefined;
-  const metadata = isRecord(value._meta) ? value._meta : isRecord(value.meta) ? value.meta : undefined;
+  const metadata = isRecord(value._meta)
+    ? value._meta
+    : isRecord(value.meta)
+      ? value.meta
+      : undefined;
   if (!metadata || !isRecord(metadata.ui)) return undefined;
 
   const result: Pick<UiResourceData, 'csp' | 'permissions'> = {};
-  if (isRecord(metadata.ui.csp)) result.csp = metadata.ui.csp as McpUiResourceCsp;
+  if (isRecord(metadata.ui.csp)) result.csp = metadata.ui.csp;
   if (isRecord(metadata.ui.permissions)) {
-    result.permissions = metadata.ui.permissions as McpUiResourcePermissions;
+    result.permissions = metadata.ui.permissions;
   }
   return result;
 }

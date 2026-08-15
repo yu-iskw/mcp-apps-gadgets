@@ -9,9 +9,10 @@ async function addGadget(page: Page, title: string, value: number) {
 }
 
 async function gadgetColumns(page: Page, index: number) {
-  return page.locator('.tile').nth(index).evaluate((element) =>
-    getComputedStyle(element).getPropertyValue('--gadget-columns').trim(),
-  );
+  return page
+    .locator('.tile')
+    .nth(index)
+    .evaluate((element) => getComputedStyle(element).getPropertyValue('--gadget-columns').trim());
 }
 
 test('discovers, lays out, parameterizes, and restores MCP App gadgets', async ({ page }) => {
