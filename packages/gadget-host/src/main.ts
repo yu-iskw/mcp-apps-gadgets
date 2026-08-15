@@ -14,9 +14,16 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 import type { CallToolResult, Resource, Tool } from '@modelcontextprotocol/sdk/types.js';
 
+declare global {
+  interface Window {
+    __MCP_APP_GADGETS_CONFIG__?: {
+      sandboxOrigin?: string;
+    };
+  }
+}
+
 const hostInfo = { name: 'mcp-app-gadgets', version: '0.3.0' };
 const STORAGE_KEY = 'mcp-app-gadgets.document.v1';
-const SANDBOX_PORT = '8081';
 const GRID_COLUMNS = 12;
 const DEFAULT_COLUMNS = 6;
 const MIN_TILE_HEIGHT = 180;
@@ -162,6 +169,28 @@ function updateGadgetLayout(id: string, layout: GadgetLayout) {
   saveDocument();
 }
 
+async function listAllTools(client: Client): Promise<Tool[]> {
+  const tools: Tool[] = [];
+  let cursor: string | undefined;
+  do {
+    const response = await client.listTools(cursor ? { cursor } : undefined);
+    tools.push(...response.tools);
+    cursor = response.nextCursor;
+  } while (cursor);
+  return tools;
+}
+
+async function listAllResources(client: Client): Promise<Resource[]> {
+  const resources: Resource[] = [];
+  let cursor: string | undefined;
+  do {
+    const response = await client.listResources(cursor ? { cursor } : undefined);
+    resources.push(...response.resources);
+    cursor = response.nextCursor;
+  } while (cursor);
+  return resources;
+}
+
 async function connectServer(serverUrl: string): Promise<ServerConnection> {
   const normalized = new URL(serverUrl).href;
   const existing = connections.get(normalized);
@@ -170,14 +199,11 @@ async function connectServer(serverUrl: string): Promise<ServerConnection> {
   const pending = (async () => {
     const client = new Client(hostInfo);
     await client.connect(new StreamableHTTPClientTransport(new URL(normalized)));
-    const [toolResponse, resourceResponse] = await Promise.all([
-      client.listTools(),
-      client.listResources(),
-    ]);
+    const [tools, resources] = await Promise.all([listAllTools(client), listAllResources(client)]);
     return {
       client,
-      tools: new Map(toolResponse.tools.map((tool) => [tool.name, tool])),
-      resources: new Map(resourceResponse.resources.map((resource) => [resource.uri, resource])),
+      tools: new Map(tools.map((tool) => [tool.name, tool])),
+      resources: new Map(resources.map((resource) => [resource.uri, resource])),
     };
   })().catch((error) => {
     connections.delete(normalized);
@@ -390,13 +416,19 @@ async function renderGadget(config: GadgetConfig) {
   }
 }
 
+function decodeBase64Utf8(blob: string): string {
+  const binary = atob(blob);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 async function getUiResource(connection: ServerConnection, uri: string): Promise<UiResourceData> {
   const response = await connection.client.readResource({ uri });
   const content = response.contents[0];
   if (content.mimeType !== RESOURCE_MIME_TYPE) {
     throw new Error(`Expected ${RESOURCE_MIME_TYPE} from ${uri}.`);
   }
-  const html = 'blob' in content ? atob(content.blob) : content.text;
+  const html = 'blob' in content ? decodeBase64Utf8(content.blob) : content.text;
   const contentUi = readUiMetadata(content);
   const listingUi = readUiMetadata(connection.resources.get(uri));
   return {
@@ -407,8 +439,9 @@ async function getUiResource(connection: ServerConnection, uri: string): Promise
 }
 
 function sandboxUrl(csp?: McpUiResourceCsp) {
-  const url = new URL('/sandbox.html', window.location.href);
-  url.port = SANDBOX_PORT;
+  const configuredOrigin = window.__MCP_APP_GADGETS_CONFIG__?.sandboxOrigin;
+  const origin = configuredOrigin ?? new URL(window.location.href).origin;
+  const url = new URL('/sandbox.html', origin);
   if (csp) url.searchParams.set('csp', JSON.stringify(csp));
   return url;
 }
