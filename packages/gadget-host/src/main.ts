@@ -230,7 +230,9 @@ async function addGadget() {
     const tool = connection.tools.get(toolSelect.value);
     if (!tool) throw new Error(`Unknown tool: ${toolSelect.value}`);
     const config: GadgetConfig = {
-      id: crypto.randomUUID(),
+      id: Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
+        value.toString(16).padStart(8, '0'),
+      ).join(''),
       serverUrl: selectedServerUrl,
       toolName: tool.name,
       title: titleInput.value || tool.title || tool.name,

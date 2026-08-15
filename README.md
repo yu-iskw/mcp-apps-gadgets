@@ -35,7 +35,7 @@ See [`docs/experiment.md`](docs/experiment.md) for scope, architecture, security
 docker compose up --build
 ```
 
-Then open <http://localhost:8080>.
+Then open `http://localhost:8080`.
 
 The included demo MCP Apps server is exposed at `http://localhost:3001/mcp`. Click **Discover apps**, select the metric-card tool, edit its JSON arguments, and add multiple gadgets with different parameters. Gadget configuration is persisted in browser `localStorage` and restored after reload.
 
