@@ -3,11 +3,27 @@ import crypto from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import cors from 'cors';
-import express from 'express';
+import { json, urlencoded } from 'express';
 
 import { createServer } from './server.js';
 
 import type { Request, Response } from 'express';
+
+interface RegistrationBody {
+  redirect_uris?: unknown;
+}
+
+interface TokenBody {
+  grant_type?: unknown;
+  code?: unknown;
+  code_verifier?: unknown;
+  redirect_uri?: unknown;
+  client_id?: unknown;
+  refresh_token?: unknown;
+}
+
+type RegistrationRequest = Request<Record<string, never>, unknown, RegistrationBody>;
+type TokenRequest = Request<Record<string, never>, unknown, TokenBody>;
 
 const port = Number(process.env.PORT ?? 3002);
 const app = createMcpExpressApp({ host: '0.0.0.0' });
@@ -16,6 +32,7 @@ const authorizationCodes = new Map<
   { clientId: string; redirectUri: string; challenge?: string }
 >();
 const accessTokens = new Set<string>();
+const refreshTokens = new Set<string>();
 
 function origin(req: Request) {
   return `${req.protocol}://${req.get('host')}`;
@@ -25,9 +42,31 @@ function base64urlSha256(value: string) {
   return crypto.createHash('sha256').update(value).digest('base64url');
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function issueTokens(res: Response) {
+  const accessToken = crypto.randomUUID();
+  const refreshToken = crypto.randomUUID();
+  accessTokens.add(accessToken);
+  refreshTokens.add(refreshToken);
+  res.json({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: 'Bearer',
+    expires_in: 3600,
+    scope: 'mcp',
+  });
+}
+
 app.use(cors({ origin: true, exposedHeaders: ['WWW-Authenticate'] }));
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(urlencoded({ extended: false }));
+app.use(json());
 app.get('/health', (_req: Request, res: Response) => res.status(200).json({ status: 'ok' }));
 
 app.get('/.well-known/oauth-protected-resource/mcp', (req: Request, res: Response) => {
@@ -48,22 +87,22 @@ app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response)
     scopes_supported: ['mcp'],
   });
 });
-app.post('/register', (req: Request, res: Response) => {
-  const redirectUris = Array.isArray(req.body?.redirect_uris) ? req.body.redirect_uris : [];
+app.post('/register', (req: RegistrationRequest, res: Response) => {
   res.status(201).json({
     client_id: crypto.randomUUID(),
-    redirect_uris: redirectUris,
+    redirect_uris: stringArray(req.body.redirect_uris),
     token_endpoint_auth_method: 'none',
   });
 });
 app.get('/authorize', (req: Request, res: Response) => {
-  const clientId = String(req.query.client_id ?? '');
-  const redirectUri = String(req.query.redirect_uri ?? '');
-  const state = String(req.query.state ?? '');
-  const challenge =
-    typeof req.query.code_challenge === 'string' ? req.query.code_challenge : undefined;
-  if (!clientId || !redirectUri)
-    return void res.status(400).send('Missing OAuth client parameters');
+  const clientId = stringValue(req.query.client_id);
+  const redirectUri = stringValue(req.query.redirect_uri);
+  const state = stringValue(req.query.state);
+  const challenge = stringValue(req.query.code_challenge) || undefined;
+  if (!clientId || !redirectUri) {
+    res.status(400).send('Missing OAuth client parameters');
+    return;
+  }
   const code = crypto.randomUUID();
   authorizationCodes.set(code, { clientId, redirectUri, challenge });
   const callback = new URL(redirectUri);
@@ -72,32 +111,33 @@ app.get('/authorize', (req: Request, res: Response) => {
   callback.searchParams.set('iss', origin(req));
   res.redirect(302, callback.href);
 });
-app.post('/token', (req: Request, res: Response) => {
-  if (req.body?.grant_type === 'refresh_token') {
-    const token = crypto.randomUUID();
-    accessTokens.add(token);
-    return void res.json({
-      access_token: token,
-      token_type: 'Bearer',
-      expires_in: 3600,
-      scope: 'mcp',
-    });
+app.post('/token', (req: TokenRequest, res: Response) => {
+  const grantType = stringValue(req.body.grant_type);
+  if (grantType === 'refresh_token') {
+    const refreshToken = stringValue(req.body.refresh_token);
+    if (!refreshToken || !refreshTokens.delete(refreshToken)) {
+      res.status(400).json({ error: 'invalid_grant' });
+      return;
+    }
+    issueTokens(res);
+    return;
   }
-  const code = String(req.body?.code ?? '');
-  const verifier = String(req.body?.code_verifier ?? '');
+
+  const code = stringValue(req.body.code);
+  const verifier = stringValue(req.body.code_verifier);
+  const redirectUri = stringValue(req.body.redirect_uri);
+  const clientId = stringValue(req.body.client_id);
   const pending = authorizationCodes.get(code);
-  if (!pending || pending.redirectUri !== String(req.body?.redirect_uri ?? '')) {
-    return void res.status(400).json({ error: 'invalid_grant' });
+  if (!pending || pending.redirectUri !== redirectUri || pending.clientId !== clientId) {
+    res.status(400).json({ error: 'invalid_grant' });
+    return;
   }
   if (pending.challenge && base64urlSha256(verifier) !== pending.challenge) {
-    return void res
-      .status(400)
-      .json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+    res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+    return;
   }
   authorizationCodes.delete(code);
-  const token = crypto.randomUUID();
-  accessTokens.add(token);
-  res.json({ access_token: token, token_type: 'Bearer', expires_in: 3600, scope: 'mcp' });
+  issueTokens(res);
 });
 
 app.all('/mcp', async (req: Request, res: Response) => {
@@ -105,7 +145,8 @@ app.all('/mcp', async (req: Request, res: Response) => {
   if (!token || !accessTokens.has(token)) {
     const metadata = `${origin(req)}/.well-known/oauth-protected-resource/mcp`;
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${metadata}", scope="mcp"`);
-    return void res.status(401).json({ error: 'invalid_token' });
+    res.status(401).json({ error: 'invalid_token' });
+    return;
   }
   const server = createServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -118,14 +159,13 @@ app.all('/mcp', async (req: Request, res: Response) => {
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error(error);
-    if (!res.headersSent)
-      res
-        .status(500)
-        .json({
-          jsonrpc: '2.0',
-          error: { code: -32603, message: 'Internal server error' },
-          id: null,
-        });
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'Internal server error' },
+        id: null,
+      });
+    }
   }
 });
 
