@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const directory = fileURLToPath(new URL('./dist/', import.meta.url));
 const hostPort = Number.parseInt(process.env.HOST_PORT ?? '8080', 10);
 const sandboxPort = Number.parseInt(process.env.SANDBOX_PORT ?? '8081', 10);
+const sandboxOrigin = process.env.SANDBOX_ORIGIN ?? `http://localhost:${sandboxPort}`;
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -42,7 +43,13 @@ function buildCspHeader(csp = {}) {
 }
 
 function safeFilePath(pathname) {
-  const relative = normalize(decodeURIComponent(pathname))
+  let decoded;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return undefined;
+  }
+  const relative = normalize(decoded)
     .replace(/^(\.\.[/\\])+/, '')
     .replace(/^[/\\]+/, '');
   return join(directory, relative || 'index.html');
@@ -50,6 +57,10 @@ function safeFilePath(pathname) {
 
 async function sendStatic(response, pathname) {
   let file = safeFilePath(pathname);
+  if (!file) {
+    response.writeHead(400).end('Malformed URL path');
+    return;
+  }
   if (!existsSync(file)) {
     response.writeHead(404).end('Not found');
     return;
@@ -62,8 +73,14 @@ async function sendStatic(response, pathname) {
 
 createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+  if (url.pathname === '/config.js') {
+    response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.end(`window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`);
+    return;
+  }
   if (url.pathname === '/sandbox.html') {
-    response.writeHead(404).end('Sandbox is served from the isolated origin on port 8081.');
+    response.writeHead(404).end('Sandbox is served from the isolated origin.');
     return;
   }
   await sendStatic(response, url.pathname === '/' ? '/index.html' : url.pathname);
