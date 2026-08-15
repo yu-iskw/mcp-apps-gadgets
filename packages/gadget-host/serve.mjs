@@ -59,7 +59,8 @@ function sandboxOriginForRequest(request) {
   if (configuredSandboxOrigin) return configuredSandboxOrigin;
   const host = request.headers.host ?? `localhost:${hostPort}`;
   const protocolHeader = request.headers['x-forwarded-proto'];
-  const protocol = typeof protocolHeader === 'string' ? protocolHeader.split(',')[0].trim() : 'http';
+  const protocol =
+    typeof protocolHeader === 'string' ? protocolHeader.split(',')[0].trim() : 'http';
   const hostname = new URL(`http://${host}`).hostname;
   return `${protocol}://${hostname}:${sandboxPort}`;
 }
@@ -86,7 +87,9 @@ createServer(async (request, response) => {
     const sandboxOrigin = sandboxOriginForRequest(request);
     response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
     response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    response.end(`window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`);
+    response.end(
+      `window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`,
+    );
     return;
   }
   if (url.pathname === '/sandbox.html') {
