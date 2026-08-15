@@ -1,62 +1,69 @@
-# {PROJECT_NAME}
+# MCP App Gadgets
 
-{PROJECT_DESCRIPTION}
+Experimental web host for composing dashboards from independently deployed [MCP Apps](https://github.com/modelcontextprotocol/ext-apps).
 
-## Getting Started
+The hypothesis is deliberately small: the host should own **composition and layout**, while each tile is supplied by an MCP Apps server. Adding a new tile type should therefore mean deploying another MCP Apps server, not adding another bespoke UI integration to this repository.
 
-### Prerequisites
+## Experiment
 
-- [pnpm](https://pnpm.io/) **11.x** (see `packageManager` in `package.json`; use [Corepack](https://nodejs.org/api/corepack.html): `corepack enable`)
-- Node.js **22+** (see `engines` in `package.json`; `.node-version` pins the version used for local dev and CI)
+A gadget is conceptually:
 
-Dependency installs follow pnpm 11 supply-chain settings in [`pnpm-workspace.yaml`](pnpm-workspace.yaml): **minimum release age** (this template uses a **7-day** quarantine, stricter than pnpm’s built-in 24-hour default), **blocking exotic transitive dependencies**, and an **`allowBuilds`** allowlist for packages that run install scripts. See [pnpm 11 release notes](https://pnpm.io/blog/releases/11.0) and [Supply-chain defaults (Socket)](https://socket.dev/blog/pnpm-11-adds-new-supply-chain-protection-defaults).
+```json
+{
+  "serverUrl": "http://localhost:3001/mcp",
+  "toolName": "render-metric",
+  "arguments": {
+    "title": "Requests",
+    "value": 1284,
+    "unit": "/ min"
+  },
+  "title": "Traffic"
+}
+```
 
-Linting and formatting use [Trunk](https://trunk.io/) (ESLint, Prettier, and more). The Trunk **launcher** is installed with project dependencies—you do not need a separate Trunk install for the default workflow.
+The browser host connects to the MCP server over Streamable HTTP, discovers tools that declare MCP App UI resources, invokes the selected tool with tile-specific arguments, reads the `ui://` resource, and mounts it through the MCP Apps host bridge.
 
-### Installation
+See [`docs/experiment.md`](docs/experiment.md) for scope, architecture, security boundaries, and follow-up experiments.
+
+## Run with Docker Compose
 
 ```bash
+docker compose up --build
+```
+
+Then open <http://localhost:8080>.
+
+The included demo MCP Apps server is exposed at `http://localhost:3001/mcp`. Click **Discover apps**, select the metric-card tool, edit its JSON arguments, and add multiple gadgets with different parameters.
+
+## Packages
+
+- `packages/gadget-host`: generic browser-based MCP Apps gadget composer.
+- `packages/demo-mcp-app`: isolated parameterized MCP Apps HTTP server used to prove the composition model.
+- `packages/common`: shared package from the repository template; currently not needed by the experiment.
+
+## Development
+
+Prerequisites are Node.js 22+, pnpm 11, and Corepack.
+
+```bash
+corepack enable
 pnpm install
+pnpm --filter @mcp-app-gadgets/host dev
 ```
 
-Optional: prefetch Trunk’s hermetic tools (helpful for offline work or CI images):
+In another shell:
 
 ```bash
-pnpm exec trunk install
+pnpm --filter @mcp-app-gadgets/demo-mcp-app build
+pnpm --filter @mcp-app-gadgets/demo-mcp-app start
 ```
 
-If you prefer a global `trunk` on your PATH, see the [Trunk installation guide](https://docs.trunk.io/references/cli/getting-started/install) (e.g. `brew install trunk-io` on macOS).
+## Security status
 
-### Supply-chain protections
+This is an experiment, not a production host. The current tile iframe uses a restrictive sandbox sufficient for evaluating the composition model, but production should adopt the MCP Apps reference host's double-iframe sandbox proxy, CSP and permissions enforcement, strict origin checks, endpoint trust policy, authentication/token delegation, SSRF controls, audit logging, and network egress policy.
 
-The template uses **pnpm 11** with settings in [`pnpm-workspace.yaml`](pnpm-workspace.yaml): a **7-day** [`minimumReleaseAge`](https://pnpm.io/settings#minimumreleaseage) (10080 minutes, stricter than pnpm’s default 1 day), [`blockExoticSubdeps`](https://pnpm.io/settings#blockexoticsubdeps) enabled, and an [`allowBuilds`](https://pnpm.io/settings#allowbuilds) map for dependencies that must run install scripts (pnpm 11 requires this for native toolchain packages such as esbuild). See the [pnpm 11 release notes](https://pnpm.io/blog/releases/11.0).
-
-CI: pull requests and `main` run `pnpm lint:security` then generate/scan an SPDX SBOM (`.github/workflows/sbom.yml`). Publish re-checks `pnpm lint:security` before npm publish.
-
-### Development
-
-```bash
-pnpm dev
-```
-
-### Build
-
-```bash
-pnpm build
-```
-
-### Linting & Formatting
-
-```bash
-pnpm lint
-pnpm format
-```
-
-## Project Structure
-
-- `packages/`: Monorepo packages
-  - `common/`: Shared utilities and types
+Do not connect the experiment to untrusted MCP endpoints with sensitive credentials or data.
 
 ## License
 
-{LICENSE}
+Apache-2.0
