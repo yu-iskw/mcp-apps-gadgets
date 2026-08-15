@@ -4,6 +4,7 @@ const clientInfo = { name: 'mcp-app-gadgets-realtime', version: '0.1.0' };
 const RECONNECT_DELAY_MS = 1_000;
 
 interface Runtime {
+  serverUrl: string;
   client: Client;
   dependencies: Map<string, Set<string>>;
   subscription?: McpSubscription;
@@ -54,25 +55,35 @@ export class RealtimeInvalidationManager {
     );
   }
 
+  private async createClient(serverUrl: string, runtime?: Runtime): Promise<Client> {
+    const client = new Client(clientInfo, {
+      versionNegotiation: { mode: { pin: '2026-07-28' } },
+    });
+    if (runtime) this.installNotificationHandler(client, runtime);
+    await client.connect(new StreamableHTTPClientTransport(new URL(serverUrl)));
+    return client;
+  }
+
+  private installNotificationHandler(client: Client, runtime: Runtime) {
+    client.setNotificationHandler('notifications/resources/updated', (notification) => {
+      const gadgetIds = runtime.dependencies.get(notification.params.uri);
+      if (!gadgetIds) return;
+      for (const gadgetId of gadgetIds) this.onInvalidate(gadgetId);
+    });
+  }
+
   private async getRuntime(serverUrl: string): Promise<Runtime> {
     const existing = this.runtimes.get(serverUrl);
     if (existing) return existing;
 
     const pending = (async () => {
-      const client = new Client(clientInfo, {
-        versionNegotiation: { mode: { pin: '2026-07-28' } },
-      });
-      await client.connect(new StreamableHTTPClientTransport(new URL(serverUrl)));
-      const runtime: Runtime = {
-        client,
-        dependencies: new Map(),
+      const runtime = {
+        serverUrl,
+        client: undefined as unknown as Client,
+        dependencies: new Map<string, Set<string>>(),
         generation: 0,
-      };
-      client.setNotificationHandler('notifications/resources/updated', (notification) => {
-        const gadgetIds = runtime.dependencies.get(notification.params.uri);
-        if (!gadgetIds) return;
-        for (const gadgetId of gadgetIds) this.onInvalidate(gadgetId);
-      });
+      } satisfies Runtime;
+      runtime.client = await this.createClient(serverUrl, runtime);
       return runtime;
     })().catch((error) => {
       this.runtimes.delete(serverUrl);
@@ -81,6 +92,27 @@ export class RealtimeInvalidationManager {
 
     this.runtimes.set(serverUrl, pending);
     return pending;
+  }
+
+  private async recoverRuntime(runtime: Runtime, generation: number): Promise<void> {
+    if (generation !== runtime.generation || runtime.dependencies.size === 0) return;
+    try {
+      await runtime.client.close();
+    } catch {
+      // The transport may already be gone; recovery continues with a new client.
+    }
+    if (generation !== runtime.generation) return;
+    runtime.client = await this.createClient(runtime.serverUrl, runtime);
+
+    // Subscriptions do not replay missed events. Refetch each dependent tile once
+    // after reconnect so the UI catches up to the server's authoritative state.
+    const gadgetIds = new Set<string>();
+    for (const dependencies of runtime.dependencies.values()) {
+      for (const gadgetId of dependencies) gadgetIds.add(gadgetId);
+    }
+    for (const gadgetId of gadgetIds) this.onInvalidate(gadgetId);
+
+    if (generation === runtime.generation) await this.refreshSubscription(runtime);
   }
 
   private async refreshSubscription(runtime: Runtime): Promise<void> {
@@ -104,8 +136,8 @@ export class RealtimeInvalidationManager {
       if (reason === 'local' || generation !== runtime.generation) return;
       runtime.subscription = undefined;
       runtime.reconnectTimer = window.setTimeout(() => {
-        if (generation !== runtime.generation) return;
-        void this.refreshSubscription(runtime);
+        runtime.reconnectTimer = undefined;
+        void this.recoverRuntime(runtime, generation);
       }, RECONNECT_DELAY_MS);
     });
   }
