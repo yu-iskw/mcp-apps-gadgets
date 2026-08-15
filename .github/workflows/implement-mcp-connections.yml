@@ -1,0 +1,39 @@
+name: Implement MCP connections
+
+on:
+  push:
+    branches:
+      - feat/mcp-connections-oauth
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: feat/mcp-connections-oauth
+      - run: python scripts/implement-mcp-connections.py
+      - run: python scripts/add-oauth-e2e.py
+      - run: corepack enable
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
+        with:
+          version: 11.1.2
+          run_install: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm exec prettier --write packages/gadget-host/src/main.ts packages/gadget-host/src/oauth.ts packages/gadget-host/index.html packages/oauth-demo-mcp-app tests/e2e/gadgets.spec.ts docker-compose.yml docs/experiment.md
+      - run: pnpm build
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add trusted OAuth MCP connections" || exit 0
+          git push origin HEAD:feat/mcp-connections-oauth
