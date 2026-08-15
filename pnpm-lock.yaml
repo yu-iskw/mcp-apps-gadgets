@@ -110,6 +110,37 @@ importers:
         specifier: ^1.19.9
         version: 1.30.0(zod@4.3.6)
 
+  packages/oauth-demo-mcp-app:
+    dependencies:
+      '@modelcontextprotocol/ext-apps':
+        specifier: ^1.7.5
+        version: 1.7.5(@modelcontextprotocol/sdk@1.30.0(zod@3.25.76))(zod@3.25.76)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.19.9
+        version: 1.30.0(zod@3.25.76)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.11
+      vite-plugin-singlefile:
+        specifier: ^2.3.0
+        version: 2.3.3(vite@8.0.16(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.23.11)(yaml@2.8.3))
+
 packages:
 
   '@babel/code-frame@7.29.7':
@@ -3323,7 +3354,7 @@ snapshots:
       debug: 4.4.3
       minimatch: 10.2.5
       semver: 7.7.4
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -3338,7 +3369,7 @@ snapshots:
       debug: 4.4.3
       minimatch: 10.2.5
       semver: 7.7.4
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:

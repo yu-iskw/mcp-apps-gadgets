@@ -8,4 +8,4 @@ RUN chown -R pwuser:pwuser /workspace
 USER pwuser
 WORKDIR /workspace/tests/e2e
 HEALTHCHECK CMD node --version >/dev/null 2>&1 || exit 1
-CMD ["pnpm", "exec", "playwright", "test"]
+CMD ["sh", "-c", "node proxy.mjs & sleep 1; exec pnpm exec playwright test"]

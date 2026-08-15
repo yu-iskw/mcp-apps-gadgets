@@ -8,6 +8,7 @@ services:
       - 8081:8081
     depends_on:
       - demo-mcp-app
+      - oauth-demo-mcp-app
 
   demo-mcp-app:
     build:
@@ -18,13 +19,25 @@ services:
     ports:
       - 3001:3001
 
+  oauth-demo-mcp-app:
+    build:
+      context: .
+      dockerfile: packages/oauth-demo-mcp-app/Dockerfile
+    environment:
+      PORT: 3002
+    ports:
+      - 3002:3002
+
   e2e:
     profiles: [e2e]
     build:
       context: .
       dockerfile: tests/e2e/Dockerfile
     environment:
-      BASE_URL: http://gadget-host:8080
+      BASE_URL: http://localhost:8080
+      GADGET_HOST: gadget-host
+      GADGET_HOST_PORT: 8080
     depends_on:
       - gadget-host
       - demo-mcp-app
+      - oauth-demo-mcp-app
