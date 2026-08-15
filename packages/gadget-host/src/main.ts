@@ -12,6 +12,8 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
+import { RealtimeInvalidationManager } from './realtime.js';
+
 import type { CallToolResult, Resource, Tool } from '@modelcontextprotocol/sdk/types.js';
 
 declare global {
@@ -22,11 +24,13 @@ declare global {
   }
 }
 
-const hostInfo = { name: 'mcp-app-gadgets', version: '0.4.0' };
+const hostInfo = { name: 'mcp-app-gadgets', version: '0.5.0' };
 const STORAGE_KEY = 'mcp-app-gadgets.document.v1';
+const DEPENDENCIES_META_KEY = 'io.mcp-app-gadgets/dependencies';
 const GRID_COLUMNS = 12;
 const DEFAULT_COLUMNS = 6;
 const MIN_TILE_HEIGHT = 180;
+const INVALIDATION_DEBOUNCE_MS = 100;
 
 type GadgetState = 'loading' | 'ready' | 'error';
 
@@ -128,6 +132,13 @@ function readUiMetadata(value: unknown): Pick<UiResourceData, 'csp' | 'permissio
   return result;
 }
 
+function readDependencyUris(result: CallToolResult): string[] {
+  if (!isRecord(result._meta)) return [];
+  const dependencies = result._meta[DEPENDENCIES_META_KEY];
+  if (!isRecord(dependencies) || !Array.isArray(dependencies.resources)) return [];
+  return dependencies.resources.filter((uri): uri is string => typeof uri === 'string');
+}
+
 function messageMethod(value: unknown): string | undefined {
   return isRecord(value) && typeof value.method === 'string' ? value.method : undefined;
 }
@@ -153,6 +164,8 @@ const status = document.querySelector<HTMLOutputElement>('#status')!;
 const grid = document.querySelector<HTMLElement>('#grid')!;
 
 const connections = new Map<string, Promise<ServerConnection>>();
+const invalidationTimers = new Map<string, number>();
+const realtime = new RealtimeInvalidationManager((gadgetId) => scheduleGadgetRefresh(gadgetId));
 let selectedServerUrl = serverUrlInput.value;
 const gadgetDocument = loadDocument();
 let draggedGadgetId: string | undefined;
@@ -512,6 +525,31 @@ function setTileState(element: HTMLElement, state: GadgetState, message?: string
   element.textContent = message ?? state[0].toUpperCase() + state.slice(1);
 }
 
+function scheduleGadgetRefresh(gadgetId: string) {
+  const existing = invalidationTimers.get(gadgetId);
+  if (existing !== undefined) window.clearTimeout(existing);
+  invalidationTimers.set(
+    gadgetId,
+    window.setTimeout(() => {
+      invalidationTimers.delete(gadgetId);
+      void refreshGadget(gadgetId);
+    }, INVALIDATION_DEBOUNCE_MS),
+  );
+}
+
+async function refreshGadget(gadgetId: string) {
+  const config = gadgetDocument.gadgets.find((gadget) => gadget.id === gadgetId);
+  const current = grid.querySelector<HTMLElement>(`[data-gadget-id="${CSS.escape(gadgetId)}"]`);
+  if (!config || !current) return;
+  const nextSibling = current.nextSibling;
+  current.remove();
+  await renderGadget(config);
+  const replacement = grid.querySelector<HTMLElement>(
+    `[data-gadget-id="${CSS.escape(gadgetId)}"]`,
+  );
+  if (replacement && nextSibling?.parentNode === grid) grid.insertBefore(replacement, nextSibling);
+}
+
 async function renderGadget(config: GadgetConfig) {
   const tile = document.createElement('article');
   tile.className = 'tile';
@@ -556,6 +594,7 @@ async function renderGadget(config: GadgetConfig) {
     if (editingGadgetId === config.id) cancelEditing();
     saveDocument();
     tile.remove();
+    void realtime.removeGadget(config.id);
     setStatus(`Removed ${config.title}.`);
   });
 
@@ -565,9 +604,11 @@ async function renderGadget(config: GadgetConfig) {
     if (!tool) {
       throw new Error(`Tool ${config.toolName} is no longer advertised by ${config.serverUrl}.`);
     }
-    await mountAppTile(tile, connection, tool, config.arguments);
+    const dependencies = await mountAppTile(tile, connection, tool, config.arguments);
+    await realtime.setDependencies(config.serverUrl, config.id, dependencies);
     setTileState(state, 'ready');
   } catch (error) {
+    await realtime.removeGadget(config.id);
     const message = error instanceof Error ? error.message : String(error);
     setTileState(state, 'error', 'Error');
     state.title = message;
@@ -641,7 +682,7 @@ async function mountAppTile(
   connection: ServerConnection,
   tool: Tool,
   args: Record<string, unknown>,
-) {
+): Promise<string[]> {
   const resourceUri = getToolUiResourceUri(tool);
   if (!resourceUri) throw new Error('Tool does not declare an MCP App resource.');
 
@@ -700,18 +741,19 @@ async function mountAppTile(
   });
   await initialized;
   void bridge.sendToolInput({ arguments: args });
-  void resultPromise.then(
-    (result) => {
-      void bridge.sendToolResult(result);
-    },
-    (error) => {
-      void bridge.sendToolCancelled({
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    },
-  );
 
-  removeBridgeOnTileRemoval(tile, bridge);
+  try {
+    const result = await resultPromise;
+    void bridge.sendToolResult(result);
+    removeBridgeOnTileRemoval(tile, bridge);
+    return readDependencyUris(result);
+  } catch (error) {
+    void bridge.sendToolCancelled({
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    await bridge.close();
+    throw error;
+  }
 }
 
 function removeBridgeOnTileRemoval(tile: HTMLElement, bridge: AppBridge) {
@@ -725,6 +767,7 @@ function removeBridgeOnTileRemoval(tile: HTMLElement, bridge: AppBridge) {
 }
 
 async function rerenderDocument() {
+  await realtime.retainGadgets(new Set(gadgetDocument.gadgets.map((gadget) => gadget.id)));
   grid.replaceChildren();
   for (const gadget of gadgetDocument.gadgets) await renderGadget(gadget);
 }
