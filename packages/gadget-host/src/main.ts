@@ -347,7 +347,11 @@ async function duplicateGadget(config: GadgetConfig) {
     arguments: structuredClone(config.arguments),
     layout: config.layout ? { ...config.layout } : undefined,
   };
-  gadgetDocument.gadgets.splice(index < 0 ? gadgetDocument.gadgets.length : index + 1, 0, duplicate);
+  gadgetDocument.gadgets.splice(
+    index < 0 ? gadgetDocument.gadgets.length : index + 1,
+    0,
+    duplicate,
+  );
   saveDocument();
   await rerenderDocument();
   setStatus(`Duplicated ${config.title}.`);

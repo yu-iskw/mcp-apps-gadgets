@@ -60,7 +60,11 @@ test('manages and restores an MCP App gadget workspace', async ({ page }) => {
     .locator('#arguments')
     .fill(JSON.stringify({ title: 'Workers', value: 99, unit: 'req/min' }));
   await page.locator('#add').click();
-  await expect(page.locator('.tile h2')).toHaveText(['API requests', 'API requests copy', 'Workers']);
+  await expect(page.locator('.tile h2')).toHaveText([
+    'API requests',
+    'API requests copy',
+    'Workers',
+  ]);
   const workersView = page.locator('.tile').nth(2).frameLocator('iframe').frameLocator('iframe');
   await expect(workersView.locator('#value')).toHaveText('99');
 
@@ -72,7 +76,11 @@ test('manages and restores an MCP App gadget workspace', async ({ page }) => {
   await page.reload();
   await expect(page.locator('.tile')).toHaveCount(3);
   await expect(page.locator('#status')).toContainText('Restored 3 gadget');
-  await expect(page.locator('.tile h2')).toHaveText(['API requests', 'API requests copy', 'Workers']);
+  await expect(page.locator('.tile h2')).toHaveText([
+    'API requests',
+    'API requests copy',
+    'Workers',
+  ]);
   await expect.poll(() => gadgetColumns(page, 0)).toBe(resizedColumns);
 
   const importedWorkspace = {
