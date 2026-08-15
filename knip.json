@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["grype"],
+  "ignoreDependencies": ["stylelint-config-standard"],
   "workspaces": {
     ".": {
       "entry": ["stylelint.config.mjs", "tests/e2e/*.ts"],
@@ -10,11 +11,11 @@
       "project": ["src/**/*.ts"]
     },
     "packages/gadget-host": {
-      "entry": ["src/main.ts", "src/sandbox.ts"],
+      "entry": ["src/sandbox.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/demo-mcp-app": {
-      "entry": ["main.ts", "server.ts", "src/app.ts"],
+      "entry": ["server.ts", "src/app.ts"],
       "project": ["**/*.ts"]
     }
   }
