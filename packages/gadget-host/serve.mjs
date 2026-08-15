@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const directory = fileURLToPath(new URL('./dist/', import.meta.url));
 const hostPort = Number.parseInt(process.env.HOST_PORT ?? '8080', 10);
 const sandboxPort = Number.parseInt(process.env.SANDBOX_PORT ?? '8081', 10);
-const sandboxOrigin = process.env.SANDBOX_ORIGIN ?? `http://localhost:${sandboxPort}`;
+const configuredSandboxOrigin = process.env.SANDBOX_ORIGIN;
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -55,6 +55,15 @@ function safeFilePath(pathname) {
   return join(directory, relative || 'index.html');
 }
 
+function sandboxOriginForRequest(request) {
+  if (configuredSandboxOrigin) return configuredSandboxOrigin;
+  const host = request.headers.host ?? `localhost:${hostPort}`;
+  const protocolHeader = request.headers['x-forwarded-proto'];
+  const protocol = typeof protocolHeader === 'string' ? protocolHeader.split(',')[0].trim() : 'http';
+  const hostname = new URL(`http://${host}`).hostname;
+  return `${protocol}://${hostname}:${sandboxPort}`;
+}
+
 async function sendStatic(response, pathname) {
   let file = safeFilePath(pathname);
   if (!file) {
@@ -74,6 +83,7 @@ async function sendStatic(response, pathname) {
 createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
   if (url.pathname === '/config.js') {
+    const sandboxOrigin = sandboxOriginForRequest(request);
     response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
     response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     response.end(`window.__MCP_APP_GADGETS_CONFIG__=${JSON.stringify({ sandboxOrigin })};`);
