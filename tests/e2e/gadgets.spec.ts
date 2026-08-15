@@ -37,10 +37,13 @@ test('manages and restores an MCP App gadget workspace', async ({ page }) => {
   const resizeHandle = firstTile.locator('.resize-handle');
   const box = await resizeHandle.boundingBox();
   if (!box) throw new Error('Resize handle is not visible.');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const pointerX = box.x + box.width / 2;
+  const pointerY = box.y + box.height / 2;
+  await page.mouse.move(pointerX, pointerY);
   await page.mouse.down();
-  await page.mouse.move(box.x + 260, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.move(pointerX + 500, pointerY, { steps: 8 });
   await page.mouse.up();
+  await expect(page.locator('#status')).toContainText('Saved API requests layout');
   await expect.poll(() => gadgetColumns(page, 0)).not.toBe('6');
   const resizedColumns = await gadgetColumns(page, 0);
 

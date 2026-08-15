@@ -149,7 +149,7 @@ function parseDocument(raw: string): GadgetDocument {
   if (parsed.version === 1) {
     const connections: ConnectionConfig[] = [];
     const byUrl = new Map<string, string>();
-    const gadgets = parsed.gadgets.flatMap((value, index) => {
+    const gadgets = parsed.gadgets.flatMap((value) => {
       if (
         !isRecord(value) ||
         !isRecord(value.arguments) ||
@@ -219,6 +219,7 @@ const composer = document.querySelector<HTMLElement>('#composer')!;
 const serverUrlInput = document.querySelector<HTMLInputElement>('#server-url')!;
 const authModeInput = document.querySelector<HTMLSelectElement>('#auth-mode')!;
 const connectButton = document.querySelector<HTMLButtonElement>('#connect')!;
+const clearOAuthButton = document.querySelector<HTMLButtonElement>('#clear-oauth')!;
 const toolSelect = document.querySelector<HTMLSelectElement>('#tool')!;
 const titleInput = document.querySelector<HTMLInputElement>('#tile-title')!;
 const argumentsInput = document.querySelector<HTMLTextAreaElement>('#arguments')!;
@@ -341,7 +342,11 @@ async function connectServer(config: ConnectionConfig): Promise<ServerConnection
     );
     const callback = oauthCallback();
     if (provider && callback?.connectionId === config.id) {
+      if (!callback.state || callback.state !== provider.state()) {
+        throw new Error('OAuth state validation failed.');
+      }
       await transport.finishAuth(callback.code);
+      provider.clearAuthorizationState();
       clearOAuthCallback();
     }
     await client.connect(transport);
@@ -388,6 +393,22 @@ async function discoverApps(preferredTool?: string) {
 
 connectButton.addEventListener('click', () => {
   void discoverApps();
+});
+
+clearOAuthButton.addEventListener('click', () => {
+  const connectionId = selectedConnectionId;
+  if (!connectionId) {
+    setStatus('Select an OAuth connection first.');
+    return;
+  }
+  const config = connectionById(connectionId);
+  if (config.auth.type !== 'oauth') {
+    setStatus(`${config.displayName} does not use OAuth.`);
+    return;
+  }
+  runtimeConnections.delete(config.id);
+  new BrowserOAuthProvider(config.id, config.serverUrl).logout();
+  setStatus(`Cleared OAuth session for ${config.displayName}.`);
 });
 
 async function addOrSaveGadget() {
@@ -505,6 +526,11 @@ importFileInput.addEventListener('change', () => {
     .text()
     .then(async (raw) => {
       const imported = parseDocument(raw);
+      gadgetDocument.connections.splice(
+        0,
+        gadgetDocument.connections.length,
+        ...imported.connections,
+      );
       gadgetDocument.gadgets.splice(0, gadgetDocument.gadgets.length, ...imported.gadgets);
       saveDocument();
       cancelEditing();
