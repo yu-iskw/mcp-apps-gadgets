@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   sbom:
-    name: Audit dependencies and generate canonical SBOM
+    name: Audit dependencies and generate SBOM
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -74,7 +74,6 @@ jobs:
         run: pnpm lint:security
 
       - name: Generate SPDX SBOM
-        if: github.event_name != 'schedule'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           output-file: sbom.spdx.json
@@ -84,7 +83,6 @@ jobs:
           upload-release-assets: false
 
       - name: Scan SBOM for vulnerabilities
-        if: github.event_name != 'schedule'
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           sbom: sbom.spdx.json
