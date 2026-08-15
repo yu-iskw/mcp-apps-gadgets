@@ -9,7 +9,6 @@ services:
     depends_on:
       - demo-mcp-app
       - oauth-demo-mcp-app
-      - oauth-demo-mcp-app
 
   demo-mcp-app:
     build:
@@ -39,3 +38,4 @@ services:
     depends_on:
       - gadget-host
       - demo-mcp-app
+      - oauth-demo-mcp-app
