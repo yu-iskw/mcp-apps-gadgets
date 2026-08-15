@@ -50,7 +50,6 @@ export class BrowserOAuthProvider implements OAuthClientProvider {
   }
 
   redirectToAuthorization(url: URL) {
-    sessionStorage.setItem(`${PREFIX}pendingConnectionId`, this.connectionId);
     window.location.assign(url.href);
   }
 
@@ -75,6 +74,10 @@ export class BrowserOAuthProvider implements OAuthClientProvider {
     return value;
   }
 
+  clearAuthorizationState() {
+    sessionStorage.removeItem(key(this.connectionId, 'state'));
+  }
+
   invalidateCredentials(scope: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery') {
     if (scope === 'all' || scope === 'client')
       sessionStorage.removeItem(key(this.connectionId, 'client'));
@@ -82,6 +85,7 @@ export class BrowserOAuthProvider implements OAuthClientProvider {
       sessionStorage.removeItem(key(this.connectionId, 'tokens'));
     if (scope === 'all' || scope === 'verifier')
       sessionStorage.removeItem(key(this.connectionId, 'verifier'));
+    if (scope === 'all') this.clearAuthorizationState();
   }
 
   logout() {
@@ -91,13 +95,15 @@ export class BrowserOAuthProvider implements OAuthClientProvider {
   }
 }
 
-export function oauthCallback(): { connectionId: string; code: string } | undefined {
+export function oauthCallback():
+  | { connectionId: string; code: string; state: string | undefined }
+  | undefined {
   const url = new URL(window.location.href);
   if (url.searchParams.get('oauth_callback') !== '1') return undefined;
   const connectionId = url.searchParams.get('connection_id');
   const code = url.searchParams.get('code');
   if (!connectionId || !code) return undefined;
-  return { connectionId, code };
+  return { connectionId, code, state: url.searchParams.get('state') ?? undefined };
 }
 
 export function clearOAuthCallback() {
