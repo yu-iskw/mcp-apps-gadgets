@@ -7,4 +7,6 @@ RUN pnpm install --filter @mcp-app-gadgets/host... --frozen-lockfile
 COPY packages/gadget-host packages/gadget-host
 RUN pnpm --filter @mcp-app-gadgets/host build
 EXPOSE 8080 8081
+USER node
+HEALTHCHECK CMD wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1
 CMD ["pnpm", "--filter", "@mcp-app-gadgets/host", "start"]
