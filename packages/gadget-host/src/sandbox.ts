@@ -4,16 +4,12 @@ import {
   type McpUiSandboxResourceReadyNotification,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
 
-const allowedHostOrigins = new Set([
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-]);
-
 if (window.self === window.top) throw new Error("Sandbox proxy must run inside an iframe.");
 if (!document.referrer) throw new Error("Missing embedding referrer.");
 
-const hostOrigin = new URL(document.referrer).origin;
-if (!allowedHostOrigins.has(hostOrigin) && new URL(hostOrigin).port !== "8080") {
+const hostUrl = new URL(document.referrer);
+const hostOrigin = hostUrl.origin;
+if (hostUrl.hostname !== window.location.hostname || hostUrl.port !== "8080") {
   throw new Error(`Embedding origin is not allowed: ${hostOrigin}`);
 }
 const ownOrigin = window.location.origin;
