@@ -17,6 +17,10 @@
     "packages/demo-mcp-app": {
       "entry": ["server.ts", "src/app.ts"],
       "project": ["**/*.ts"]
+    },
+    "packages/oauth-demo-mcp-app": {
+      "entry": ["server.ts", "src/app.ts"],
+      "project": ["**/*.ts"]
     }
   }
 }
