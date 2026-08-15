@@ -23,7 +23,7 @@ export function getLiveMetricValue() {
 export function createServer() {
   const server = new McpServer({
     name: 'mcp-app-gadgets-demo',
-    version: '0.2.0',
+    version: '0.3.0',
   });
 
   server.registerTool(
@@ -36,14 +36,19 @@ export function createServer() {
         value: z.union([z.string(), z.number()]).optional(),
         unit: z.string().optional(),
         live: z.boolean().optional(),
+        refreshPolicy: z.enum(['on-open', 'live', 'manual']).optional(),
       }),
       _meta: { ui: { resourceUri } },
     },
-    async ({ title, value, unit, live }) => {
-      const renderedValue = live ? liveMetricValue : value;
+    async ({ title, value, unit, live, refreshPolicy }) => {
+      // `live` is kept for compatibility with earlier saved demo workspaces.
+      const effectivePolicy = refreshPolicy ?? (live ? 'live' : undefined);
+      const readsAuthoritativeMetric = effectivePolicy !== undefined;
+      const renderedValue = readsAuthoritativeMetric ? liveMetricValue : value;
       if (renderedValue === undefined) {
-        throw new Error('value is required unless live=true');
+        throw new Error('value is required unless a refreshPolicy is configured');
       }
+
       return {
         content: [
           {
@@ -51,14 +56,23 @@ export function createServer() {
             text: `${title}: ${renderedValue}${unit ? ` ${unit}` : ''}`,
           },
         ],
-        structuredContent: { title, value: renderedValue, unit: unit ?? '' },
-        _meta: live
-          ? {
-              'io.mcp-app-gadgets/dependencies': {
-                resources: [liveMetricUri],
-              },
-            }
-          : undefined,
+        structuredContent: {
+          title,
+          value: renderedValue,
+          unit: unit ?? '',
+          refreshPolicy: effectivePolicy ?? 'static',
+        },
+        // Opening a gadget always calls the tool, so on-open/manual get fresh
+        // authoritative data without a subscription. Only live gadgets declare
+        // an observable dependency and opt into background invalidation.
+        _meta:
+          effectivePolicy === 'live'
+            ? {
+                'io.mcp-app-gadgets/dependencies': {
+                  resources: [liveMetricUri],
+                },
+              }
+            : undefined,
       };
     },
   );
