@@ -1,11 +1,11 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: ".",
+  testDir: '.',
   timeout: 30_000,
   use: {
-    baseURL: process.env.BASE_URL ?? "http://gadget-host:8080",
-    browserName: "chromium",
+    baseURL: process.env.BASE_URL ?? 'http://gadget-host:8080',
+    browserName: 'chromium',
   },
-  reporter: "line",
+  reporter: 'line',
 });
