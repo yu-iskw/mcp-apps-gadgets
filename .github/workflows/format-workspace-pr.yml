@@ -1,0 +1,44 @@
+name: Format workspace PR
+
+on:
+  push:
+    branches:
+      - feat/workspace-layout-lifecycle
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: feat/workspace-layout-lifecycle
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
+        with:
+          version: 11.1.2
+          run_install: false
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format changed source files
+        run: pnpm exec prettier --write packages/gadget-host/src/main.ts tests/e2e/gadgets.spec.ts
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/gadget-host/src/main.ts tests/e2e/gadgets.spec.ts
+          git commit -m "style: format workspace lifecycle changes"
+          git push origin HEAD:feat/workspace-layout-lifecycle
