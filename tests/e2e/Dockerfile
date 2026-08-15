@@ -1,8 +1,11 @@
 FROM mcr.microsoft.com/playwright:v1.56.0-noble
-WORKDIR /tests
-RUN npm init -y && npm install --save-dev @playwright/test@1.56.0
-COPY tests/e2e ./
-RUN chown -R pwuser:pwuser /tests
+WORKDIR /workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+RUN corepack enable && pnpm install --frozen-lockfile
+COPY tests/e2e ./tests/e2e
+RUN chown -R pwuser:pwuser /workspace
 USER pwuser
+WORKDIR /workspace/tests/e2e
 HEALTHCHECK CMD node --version >/dev/null 2>&1 || exit 1
-CMD ["npx", "playwright", "test"]
+CMD ["pnpm", "exec", "playwright", "test"]
