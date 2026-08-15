@@ -32,7 +32,7 @@ jobs:
           node-version-file: .node-version
 
       - name: Regenerate lockfile
-        run: pnpm install --lockfile-only --no-frozen-lockfile --resolution-mode=highest
+        run: pnpm install --lockfile-only --no-frozen-lockfile --config.resolution-mode=highest
 
       - name: Commit lockfile
         run: |
