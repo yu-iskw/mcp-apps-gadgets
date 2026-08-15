@@ -199,6 +199,36 @@ export default [
     },
   },
   {
+    files: ['tests/e2e/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      ...importXPlugins,
+      ...securityRecommended.plugins,
+      '@typescript-eslint': tseslint,
+      unicorn,
+    },
+    settings: importXSettings,
+    rules: {
+      ...importXRules,
+      ...securityRecommended.rules,
+      ...tseslint.configs.recommended.rules,
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-unreachable': 'error',
+      'prefer-const': 'error',
+      'unicorn/filename-case': unicornFilenameCase,
+    },
+  },
+  {
     files: ['**/*.js'],
     ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'],
     languageOptions: {

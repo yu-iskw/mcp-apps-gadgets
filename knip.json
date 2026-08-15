@@ -1,13 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["grype"],
+  "ignoreDependencies": ["stylelint-config-standard"],
   "workspaces": {
     ".": {
-      "entry": ["stylelint.config.mjs"],
+      "entry": ["stylelint.config.mjs", "tests/e2e/*.ts"],
       "project": ["**/*.{js,cjs,mjs,ts,cts,mts}", "!packages/**", "!.trunk/**", "!node_modules/**"]
     },
     "packages/*": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/gadget-host": {
+      "entry": ["src/sandbox.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/demo-mcp-app": {
+      "entry": ["server.ts", "src/app.ts"],
+      "project": ["**/*.ts"]
     }
   }
 }

@@ -1,0 +1,53 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Harden Runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Build and start gadget stack
+        run: docker compose up -d --build gadget-host demo-mcp-app
+
+      - name: Wait for host and sandbox
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8080/ >/dev/null && curl --fail --silent http://localhost:8081/sandbox.html >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose logs
+          exit 1
+
+      - name: Run Playwright
+        run: docker compose --profile e2e run --rm e2e
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
