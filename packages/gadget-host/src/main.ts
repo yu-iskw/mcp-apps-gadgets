@@ -96,12 +96,7 @@ async function mountAppTile(tile: HTMLElement, mcpClient: Client, tool: Tool, ar
 
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", "allow-scripts allow-forms");
-  iframe.srcdoc = html;
   tile.append(iframe);
-  await new Promise<void>((resolve, reject) => {
-    iframe.addEventListener("load", () => resolve(), { once: true });
-    setTimeout(() => reject(new Error("MCP App iframe did not load.")), 10_000);
-  });
 
   const bridge = new AppBridge(
     mcpClient,
@@ -118,8 +113,13 @@ async function mountAppTile(tile: HTMLElement, mcpClient: Client, tool: Tool, ar
     const previous = bridge.oninitialized;
     bridge.oninitialized = (...values) => { resolve(); previous?.(...values); };
   });
+
   await bridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!));
-  await initialized;
+  iframe.srcdoc = html;
+  await Promise.race([
+    initialized,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("MCP App initialization timed out.")), 10_000)),
+  ]);
   bridge.sendToolInput({ arguments: args });
   bridge.sendToolResult(result);
 
