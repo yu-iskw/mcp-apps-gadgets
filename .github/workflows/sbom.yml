@@ -15,14 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: SBOM
-
-# Also runs pnpm lint:security (Trunk OSV/Trivy) after install.
+name: Dependency security and SBOM
 
 on:
   push:
     branches: [main]
-  pull_request:
+    paths:
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - "**/package.json"
+      - .github/workflows/sbom.yml
   schedule:
     - cron: 17 3 * * 1
   workflow_dispatch:
@@ -36,7 +39,7 @@ permissions:
 
 jobs:
   sbom:
-    name: Generate and scan SBOM
+    name: Audit dependencies and generate SBOM
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
