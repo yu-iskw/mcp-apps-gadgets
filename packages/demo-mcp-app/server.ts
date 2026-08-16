@@ -21,10 +21,16 @@ export function getLiveMetricValue() {
 }
 
 export function createServer() {
-  const server = new McpServer({
-    name: 'mcp-app-gadgets-demo',
-    version: '0.3.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'mcp-app-gadgets-demo',
+      version: '0.3.0',
+    },
+    {
+      // HTTP `subscriptions/listen` honors resourceSubscriptions only when this bit is set.
+      capabilities: { resources: { subscribe: true } },
+    },
+  );
 
   server.registerTool(
     'render-metric',
