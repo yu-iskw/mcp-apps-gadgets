@@ -2,7 +2,7 @@ import { createMcpExpressApp } from '@modelcontextprotocol/express';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import cors from 'cors';
-import express from 'express';
+import { json } from 'express';
 
 import { createServer, liveMetricUri, setLiveMetricValue } from './server.js';
 
@@ -17,18 +17,18 @@ const handler = createMcpHandler(createServer);
 const mcpHandler = toNodeHandler(handler);
 
 app.use(cors({ origin: true }));
-app.use(express.json());
+app.use(json());
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
-app.post('/demo/metric', async (req: Request, res: Response) => {
+app.post('/demo/metric', (req: Request, res: Response) => {
   const value: unknown = req.body?.value;
   if (typeof value !== 'string' && typeof value !== 'number') {
     res.status(400).json({ error: 'value must be a string or number' });
     return;
   }
   setLiveMetricValue(value);
-  await handler.notify.resourceUpdated(liveMetricUri);
+  handler.notify.resourceUpdated(liveMetricUri);
   res.status(200).json({ value });
 });
 app.all('/mcp', (req: Request, res: Response) => {

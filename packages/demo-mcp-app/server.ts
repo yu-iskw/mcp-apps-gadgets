@@ -40,7 +40,7 @@ export function createServer() {
       }),
       _meta: { ui: { resourceUri } },
     },
-    async ({ title, value, unit, live, refreshPolicy }) => {
+    ({ title, value, unit, live, refreshPolicy }) => {
       // `live` is kept for compatibility with earlier saved demo workspaces.
       const effectivePolicy = refreshPolicy ?? (live ? 'live' : undefined);
       const readsAuthoritativeMetric = effectivePolicy !== undefined;
@@ -100,7 +100,7 @@ export function createServer() {
       description: 'Mutable metric used to verify MCP v2 resource subscriptions.',
       mimeType: 'application/json',
     },
-    async (uri) => ({
+    (uri) => ({
       contents: [
         {
           uri: uri.href,

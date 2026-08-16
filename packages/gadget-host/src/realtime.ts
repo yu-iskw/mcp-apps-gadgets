@@ -1,4 +1,8 @@
-import { Client, StreamableHTTPClientTransport, type McpSubscription } from '@modelcontextprotocol/client';
+import {
+  Client,
+  StreamableHTTPClientTransport,
+  type McpSubscription,
+} from '@modelcontextprotocol/client';
 
 const clientInfo = { name: 'mcp-app-gadgets-realtime', version: '0.1.0' };
 const RECONNECT_DELAY_MS = 1_000;

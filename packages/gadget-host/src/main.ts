@@ -134,7 +134,13 @@ function readUiMetadata(value: unknown): Pick<UiResourceData, 'csp' | 'permissio
 
 function readDependencyUris(result: CallToolResult): string[] {
   if (!isRecord(result._meta)) return [];
-  const dependencies = result._meta[DEPENDENCIES_META_KEY];
+  let dependencies: unknown;
+  for (const [key, value] of Object.entries(result._meta)) {
+    if (key === DEPENDENCIES_META_KEY) {
+      dependencies = value;
+      break;
+    }
+  }
   if (!isRecord(dependencies) || !Array.isArray(dependencies.resources)) return [];
   return dependencies.resources.filter((uri): uri is string => typeof uri === 'string');
 }
@@ -544,9 +550,7 @@ async function refreshGadget(gadgetId: string) {
   const nextSibling = current.nextSibling;
   current.remove();
   await renderGadget(config);
-  const replacement = grid.querySelector<HTMLElement>(
-    `[data-gadget-id="${CSS.escape(gadgetId)}"]`,
-  );
+  const replacement = grid.querySelector<HTMLElement>(`[data-gadget-id="${CSS.escape(gadgetId)}"]`);
   if (replacement && nextSibling?.parentNode === grid) grid.insertBefore(replacement, nextSibling);
 }
 
