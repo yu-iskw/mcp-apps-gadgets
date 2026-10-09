@@ -29,11 +29,11 @@
     "coverage:watch": "vitest --coverage"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.0",
+    "@playwright/test": "1.64.0",
     "@trunkio/launcher": "^1.3.4",
     "@typescript-eslint/eslint-plugin": "^8.59.1",
     "@typescript-eslint/parser": "^8.59.1",
-    "@vitest/coverage-v8": "4.1.3",
+    "@vitest/coverage-v8": "4.1.11",
     "@vitest/eslint-plugin": "^1.6.16",
     "eslint": "^10.2.0",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -48,7 +48,7 @@
     "vite": "^8.0.16",
     "vitest": "^4.1.3"
   },
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@11.28.5",
   "engines": {
     "node": ">=22",
     "pnpm": ">=11.1.2"
