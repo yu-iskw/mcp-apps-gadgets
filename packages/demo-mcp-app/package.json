@@ -9,11 +9,11 @@
     "start": "tsx main.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.19.9",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "zod": "^3.25.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
