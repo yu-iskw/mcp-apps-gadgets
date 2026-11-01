@@ -22,6 +22,6 @@ overrides:
   # GHSA-r292-9mhp-454m fixed in 7.5.21+
   tar: 7.5.22
   # GHSA-rgw5-rvv9-x895 fixed in 5.0.9+
-  brace-expansion: 5.0.9
+  brace-expansion: 5.0.12
   # Nano ID 5.1.16 includes the zero-size and negative-size infinite-loop fixes.
   nanoid: 5.1.16
