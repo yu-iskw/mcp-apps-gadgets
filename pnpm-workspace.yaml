@@ -17,6 +17,8 @@ allowBuilds:
 # Allow urgent patched versions blocked by the 7-day quarantine.
 minimumReleaseAgeExclude:
   - brace-expansion@5.0.9
+  # Renovate security update: vitest@4.1.11
+  - vitest@4.1.11
 
 overrides:
   # GHSA-r292-9mhp-454m fixed in 7.5.21+
